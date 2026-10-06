@@ -17,7 +17,10 @@ export interface Session {
   logoUrl: string | null;
   isSuperAdmin: boolean;
   isSiteAdmin: boolean;
+  /** Every module's grants, "module:action". */
   permissions: string[];
+  /** The department's colour for each module, chosen under Branding in the Department Portal. */
+  branding?: { moduleColors?: Record<string, string> | null } | null;
 }
 
 export type LoginResult =

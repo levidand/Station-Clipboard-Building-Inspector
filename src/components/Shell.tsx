@@ -3,18 +3,18 @@ import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
-  AlertTriangle, Building2, CalendarDays, ChevronDown, ClipboardCheck, ExternalLink, Flame, Home, LogOut, Map as MapIcon,
+  AlertTriangle, Building2, CalendarDays, ClipboardCheck, ExternalLink, Flame, Home, Map as MapIcon,
   Megaphone, Menu as MenuIcon, Search, Settings, Siren, Stamp, X,
 } from "lucide-react";
-import { get, storageUrl } from "@/lib/api";
-import { useAuth, usePermissions } from "@/lib/auth";
-import { initials } from "@/lib/format";
+import { get } from "@/lib/api";
+import { usePermissions } from "@/lib/auth";
 import { BASE, keys } from "@/lib/inspections";
 import type { SearchResults, Today } from "@/lib/types";
-import { Count, IconButton, Input, Menu, MenuItem, MenuLink, cx } from "./ui";
-import { Logo } from "./Logo";
+import { AppHeader } from "@/shared/AppHeader";
+import { DEPARTMENT_PORTAL_WINDOW, departmentPortalHref } from "@/shared/departmentPortal";
+import { Logo } from "@/shared/Logo";
+import { Count, IconButton, Input, cx } from "./ui";
 
-export const DEPARTMENT_PORTAL_URL = (import.meta.env.VITE_DEPARTMENT_PORTAL_URL as string | undefined) || "https://go.stationclipboard.com";
 export const COMMAND_PORTAL_URL = (import.meta.env.VITE_COMMAND_PORTAL_URL as string | undefined) || "https://cmd.stationclipboard.com";
 
 interface NavDef {
@@ -44,8 +44,8 @@ const NAV: NavDef[] = [
 ];
 
 /**
- * The frame every signed-in page sits in: the navy title bar across the top,
- * the rail of sections down the left (a full-screen menu on a phone), and the
+ * The frame every signed-in page sits in: the navy title bar across the top
+ * (the Command Portal's too, from src/shared), the rail of sections down the left (a full-screen menu on a phone), and the
  * page itself. A page that prints (a report, a notice) passes `bare` and gets
  * the paper with nothing round it.
  */
@@ -61,18 +61,19 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="no-print relative z-30 flex min-h-[60px] shrink-0 items-center gap-3 bg-navy px-3 text-white shadow-bar sm:px-4">
-        <button
-          type="button" onClick={() => setMenuOpen(true)}
-          className="flex h-11 items-center gap-2 rounded-sm px-2.5 text-[15px] font-medium uppercase tracking-[0.02em] hover:bg-white/[.075] lg:hidden"
-          aria-label="Open the menu"
-        >
-          <MenuIcon className="h-6 w-6" /><span className="hidden sm:inline">Menu</span>
-        </button>
-        <Link href="/" className="flex shrink-0 items-center rounded-sm"><Logo compact={false} className="hidden sm:flex" /><Logo compact className="sm:hidden" /></Link>
-        <div className="flex min-w-0 flex-1 justify-center px-2"><GlobalSearch /></div>
-        <UserMenu />
-      </header>
+      <AppHeader
+        lead={(
+          <button
+            type="button" onClick={() => setMenuOpen(true)}
+            className="flex h-11 shrink-0 items-center gap-2 rounded-sm px-2 text-[15px] font-medium uppercase tracking-[0.02em] hover:bg-white/[.075] lg:hidden"
+            aria-label="Open the menu"
+          >
+            <MenuIcon className="h-6 w-6" /><span className="hidden md:inline">Menu</span>
+          </button>
+        )}
+      >
+        <div className="flex min-w-0 flex-1 justify-center sm:px-2"><GlobalSearch /></div>
+      </AppHeader>
 
       <div className="flex min-h-0 flex-1">
         <aside className="no-print hidden w-[250px] shrink-0 flex-col overflow-y-auto border-r border-divider bg-alt lg:flex" aria-label="Sections">
@@ -84,7 +85,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {menuOpen && createPortal(
         <div className="fixed inset-0 z-50 flex flex-col bg-alt lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="flex min-h-[60px] items-center justify-between bg-navy px-3 text-white">
+          <div className="flex min-h-14 items-center justify-between bg-navy px-2 text-white sm:px-4">
             <Logo />
             <IconButton label="Close the menu" onClick={() => setMenuOpen(false)} className="text-white hover:text-white">
               <X className="h-7 w-7" />

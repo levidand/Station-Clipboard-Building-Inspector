@@ -6,8 +6,8 @@ import { usePermissions } from "@/lib/auth";
 import { addDays } from "@/lib/format";
 import { BASE, DISCIPLINE_LABELS, keys } from "@/lib/inspections";
 import type { Discipline, InspectionRow, Listed } from "@/lib/types";
-import { Button, Segmented, Select } from "@/components/ui";
-import { Box, EmptyBox, Group, PAGE, PageHead, QueryState, SearchBox, Toolbar } from "@/components/kit";
+import { Button } from "@/components/ui";
+import { Box, EmptyBox, FilterBar, Group, PAGE, PageHead, QueryState } from "@/components/kit";
 import { InspectionListRow, ScheduleDialog } from "@/components/records";
 
 type Status = "open" | "completed" | "cancelled";
@@ -35,17 +35,16 @@ export function InspectionsPage() {
         {perms.inspect && <Button variant="primary" size="lg" onClick={() => setScheduling(true)}><ClipboardPlus className="h-5 w-5" />Schedule an inspection</Button>}
       </PageHead>
 
-      <Toolbar>
-        <Segmented value={status} onChange={setStatus} options={[
+      <FilterBar search={{ value: q, onChange: setQ, placeholder: "Business, address or number" }} filters={[
+        { label: "Status", value: status, empty: "open", onChange: setStatus, options: [
           { value: "open", label: "To do" }, { value: "completed", label: "Finished" }, { value: "cancelled", label: "Cancelled" },
-        ]} />
-        <Segmented value={scope} onChange={setScope} options={[{ value: "all", label: "Everyone's" }, { value: "mine", label: "Mine" }]} />
-        <Select value={discipline} onChange={e => setDiscipline(e.target.value as Discipline | "")} className="w-auto min-w-48" aria-label="Kind of inspection">
-          <option value="">All kinds</option>
-          {(Object.keys(DISCIPLINE_LABELS) as Discipline[]).map(d => <option key={d} value={d}>{DISCIPLINE_LABELS[d]}</option>)}
-        </Select>
-        <SearchBox value={q} onChange={setQ} placeholder="Business, address or number" />
-      </Toolbar>
+        ] },
+        { label: "Assigned to", value: scope, empty: "all", onChange: setScope, options: [{ value: "all", label: "Anyone" }, { value: "mine", label: "Me" }] },
+        { label: "Kind", value: discipline, empty: "", onChange: setDiscipline, options: [
+          { value: "", label: "All kinds" },
+          ...(Object.keys(DISCIPLINE_LABELS) as Discipline[]).map(d => ({ value: d, label: DISCIPLINE_LABELS[d] })),
+        ] },
+      ]} />
 
       <QueryState query={list}>
         {rows.length === 0 ? (
@@ -55,7 +54,7 @@ export function InspectionsPage() {
         ) : status === "open" ? (
           <OpenGroups rows={rows} today={today} />
         ) : (
-          <Group title={`${rows.length} inspection${rows.length === 1 ? "" : "s"}`}>
+          <Group title={`${status === "completed" ? "Finished" : "Cancelled"} (${rows.length})`}>
             <Box>{rows.map(r => <InspectionListRow key={r.id} row={r} today={today} />)}</Box>
           </Group>
         )}

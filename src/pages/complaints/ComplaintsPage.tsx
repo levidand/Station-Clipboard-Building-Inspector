@@ -43,18 +43,14 @@ export function ComplaintsPage() {
         {perms.cases && <Button variant="primary" size="lg" onClick={() => setAdding(true)}><Plus className="h-5 w-5" />Take a complaint</Button>}
       </PageHead>
 
-      <Toolbar>
-        <Segmented value={filter} onChange={setFilter} options={[
-          { value: "open", label: "Open" }, { value: "due", label: "Due now", tone: "danger" },
-          { value: "closed", label: "Closed", tone: "muted" }, { value: "all", label: "All" },
-        ]} />
-        <Segmented value={scope} onChange={setScope} options={[{ value: "all", label: "Everyone's" }, { value: "mine", label: "Mine" }]} />
-        <SearchBox value={q} onChange={setQ} placeholder="Number, address or owner" />
-      </Toolbar>
+      <FilterBar search={{ value: q, onChange: setQ, placeholder: "Number, address or owner" }} filters={[
+        { label: "Status", value: filter, empty: "open", onChange: setFilter, options: STATUS_OPTIONS },
+        { label: "Assigned to", value: scope, empty: "all", onChange: setScope, options: [{ value: "all", label: "Anyone" }, { value: "mine", label: "Me" }] },
+      ]} />
 
       <QueryState query={list}>
         {rows.length === 0 ? <EmptyBox title={filter === "due" ? "Nothing due" : "No complaints here"} /> : (
-          <Group title={`${rows.length} complaint${rows.length === 1 ? "" : "s"}`}>
+          <Group title={`${GROUP_TITLE[filter]} (${rows.length})`}>
             <Box>
               {rows.map(c => (
                 <ListRow

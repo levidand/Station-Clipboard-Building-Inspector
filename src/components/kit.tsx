@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowLeft, ChevronRight, RotateCw, Search, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { errorMessage, ApiError } from "@/lib/api";
-import { Button, IconButton, Input, Modal, Spinner, Textarea, cx } from "./ui";
+import { Button, Count, Field, IconButton, Input, Modal, Select, Spinner, Textarea, cx, useEscape } from "./ui";
 
 /*
  * Page building blocks, laid out the way the Command Portal's Settings and its
@@ -182,9 +182,93 @@ export function SearchBox({ value, onChange, placeholder, className }: {
   );
 }
 
-/** The row of choices and the search box over a list. */
-export function Toolbar({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-3">{children}</div>;
+/**
+ * One filter in a FilterBar's panel. `empty` is the page's usual view: Reset
+ * goes back to it, and only a value other than it shows as a chip.
+ */
+export interface FilterDef {
+  label: string;
+  value: string;
+  empty: string;
+  options: { value: string; label: string }[];
+  // Method syntax on purpose: it lets a page hand over the setter for its own union type.
+  onChange(value: string): void;
+}
+
+/**
+ * The bar over every list, the platform's filtering standard (FilterToolbar in
+ * the Department Portal): the search box on the left, a Filters button on the
+ * right that opens the choices, and every filter that's on shown underneath as
+ * a chip you can take off. Nothing narrows a list where you can't see it.
+ */
+export function FilterBar({ search, filters }: {
+  search: { value: string; onChange: (v: string) => void; placeholder: string };
+  filters: FilterDef[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
+  useEscape(open, () => setOpen(false));
+  const on = filters.filter(f => f.value !== f.empty);
+  const labelOf = (f: FilterDef) => f.options.find(o => o.value === f.value)?.label ?? f.value;
+
+  function show() {
+    setDraft(filters.map(f => f.value));
+    setOpen(true);
+  }
+  function apply() {
+    filters.forEach((f, i) => { if (draft[i] !== f.value) f.onChange(draft[i]); });
+    setOpen(false);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <SearchBox {...search} className="min-w-0 max-w-xl flex-1" />
+        <div className="relative ml-auto shrink-0">
+          <Button size="lg" aria-haspopup="dialog" aria-expanded={open} onClick={() => (open ? setOpen(false) : show())}>
+            <SlidersHorizontal className="h-5 w-5" />Filters
+            {on.length > 0 && <Count>{on.length}</Count>}
+          </Button>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-40 bg-mask/70 sm:bg-transparent" onClick={() => setOpen(false)} />
+              {/* A sheet from the bottom on a phone, a panel under the button from a tablet up. */}
+              <div role="dialog" aria-label="Filters" className="fixed inset-x-0 bottom-0 z-50 bg-surface shadow-float sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[26rem] sm:rounded-sm sm:border sm:border-divider">
+                <div className="space-y-5 px-5 py-5">
+                  <h2 className="text-[20px] font-medium leading-7 text-white">Filters</h2>
+                  {filters.map((f, i) => (
+                    <Field key={f.label} label={f.label}>
+                      <Select autoFocus={i === 0} value={draft[i]} onChange={e => setDraft(d => d.map((v, j) => (j === i ? e.target.value : v)))}>
+                        {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </Select>
+                    </Field>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 border-t border-divider px-5 py-3.5">
+                  <Button variant="ghost" onClick={() => setDraft(filters.map(f => f.empty))}>Reset</Button>
+                  <Button variant="ghost" className="ml-auto" onClick={() => setOpen(false)}>Cancel</Button>
+                  <Button variant="primary" onClick={apply}>Apply filters</Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      {on.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {on.map(f => (
+            <button
+              key={f.label} type="button" onClick={() => f.onChange(f.empty)} aria-label={`Take off the filter ${f.label}: ${labelOf(f)}`}
+              className="inline-flex h-10 items-center gap-2 rounded-[20px] bg-chip pl-4 pr-3 text-[15px] text-dark transition-colors hover:bg-chip-hover"
+            >
+              {f.label}: {labelOf(f)}<X className="h-4 w-4" />
+            </button>
+          ))}
+          {on.length > 1 && <Button variant="ghost" size="sm" className="text-sky" onClick={() => on.forEach(f => f.onChange(f.empty))}>Clear all</Button>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Asks before something that can't be undone, in plain words. */

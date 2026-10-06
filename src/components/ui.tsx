@@ -382,7 +382,7 @@ export function ChromeTab({ on, onClick, children, className }: {
 // Panels and overlays
 // ---------------------------------------------------------------------------
 
-function useEscape(open: boolean, onClose: () => void) {
+export function useEscape(open: boolean, onClose: () => void) {
   const ref = useRef(onClose);
   ref.current = onClose;
   useEffect(() => {
