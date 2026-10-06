@@ -603,15 +603,73 @@ export function ChromeTab({ on, onClick, children, className }: {
 // Panels and overlays
 // ---------------------------------------------------------------------------
 
+/*
+ * Layers, bottom to top. One scale for the whole app, so a menu can never open
+ * under something it should cover:
+ *   z-10  a page's sticky head          z-20  a bar docked at the foot (settings Save)
+ *   z-30  the title bar                 z-50  dialogs
+ *   z-[60] menus, filter panels and drop-down lists (portaled to <body>, so they
+ *          also work inside a dialog and are never cut off by a scroll box)
+ *   z-[100] toasts
+ * Maps get their own stacking context (index.css), so Leaflet's z-indexes in the
+ * hundreds stay inside the map.
+ */
+
+/** What Escape closes: only the layer opened last, so Escape in a Confirm over a dialog leaves the dialog open. */
+const escapeLayers: { current: () => void }[] = [];
+
+function onEscapeKey(e: KeyboardEvent) {
+  if (e.key !== "Escape" || e.defaultPrevented || escapeLayers.length === 0) return;
+  e.preventDefault();
+  escapeLayers[escapeLayers.length - 1].current();
+}
+
 export function useEscape(open: boolean, onClose: () => void) {
   const ref = useRef(onClose);
   ref.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") ref.current(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    if (escapeLayers.length === 0) window.addEventListener("keydown", onEscapeKey);
+    escapeLayers.push(ref);
+    return () => {
+      const at = escapeLayers.lastIndexOf(ref);
+      if (at >= 0) escapeLayers.splice(at, 1);
+      if (escapeLayers.length === 0) window.removeEventListener("keydown", onEscapeKey);
+    };
   }, [open]);
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Keeps the keyboard inside a dialog while it's open: focus goes in when it
+ * opens (to a field marked autoFocus, else the dialog itself), Tab wraps round
+ * inside it, and focus goes back to whatever opened it when it closes.
+ */
+function useFocusTrap(open: boolean, box: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    if (!open) return;
+    const before = document.activeElement as HTMLElement | null;
+    const el = box.current;
+    if (el && !el.contains(document.activeElement)) {
+      (el.querySelector<HTMLElement>("[autofocus], [data-autofocus]") ?? el).focus({ preventScroll: true });
+    }
+    function tab(e: KeyboardEvent) {
+      if (e.key !== "Tab" || !el) return;
+      // A drop-down list or menu open over the dialog looks after its own keys.
+      if (!el.contains(document.activeElement) && document.activeElement !== document.body) return;
+      const items = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(n => n.offsetParent !== null);
+      if (items.length === 0) { e.preventDefault(); el.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === el)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener("keydown", tab);
+    return () => {
+      document.removeEventListener("keydown", tab);
+      if (before && document.contains(before)) before.focus({ preventScroll: true });
+    };
+  }, [open, box]);
 }
 
 /**
