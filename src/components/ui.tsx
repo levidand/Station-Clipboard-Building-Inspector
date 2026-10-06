@@ -1,7 +1,7 @@
 import {
   Children, Fragment, forwardRef, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState,
   type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ComponentType, type CSSProperties, type InputHTMLAttributes,
-  type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type TextareaHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TextareaHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
 import clsx, { type ClassValue } from "clsx";
@@ -340,7 +340,7 @@ function SelectList({ id, anchor, options, current, onPick, onClose }: {
 
   return createPortal(
     <>
-      <div className={cx("fixed inset-0 z-[60]", phone && "bg-mask/70")} onClick={onClose} />
+      <div className={cx("fixed inset-0 z-[70]", phone && "bg-mask/70")} onClick={onClose} />
       <div
         ref={panel} id={id} role="listbox" tabIndex={-1} aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
         onKeyDown={keys}
@@ -350,7 +350,7 @@ function SelectList({ id, anchor, options, current, onPick, onClose }: {
           ...(place ?? { top: 0, left: 0, visibility: "hidden" }),
         }}
         className={cx(
-          "z-[61] overflow-y-auto bg-surface text-ink shadow-float outline-none",
+          "z-[71] overflow-y-auto bg-surface text-ink shadow-float outline-none",
           phone
             ? "fixed inset-x-0 bottom-0 max-h-[85dvh] pb-3"
             : cx("rounded-sm border border-divider py-1.5", cols > 1 ? "[column-rule:1px_solid_var(--color-divider)]" : "w-max max-w-[min(32rem,calc(100vw-16px))]"),
@@ -608,8 +608,9 @@ export function ChromeTab({ on, onClick, children, className }: {
  * under something it should cover:
  *   z-10  a page's sticky head          z-20  a bar docked at the foot (settings Save)
  *   z-30  the title bar                 z-50  dialogs
- *   z-[60] menus, filter panels and drop-down lists (portaled to <body>, so they
- *          also work inside a dialog and are never cut off by a scroll box)
+ *   z-[60] menus and filter panels     z-[70] drop-down lists (they open inside those)
+ *          Both are portaled to <body>, so they work inside a dialog too and are
+ *          never cut off by a scroll box or covered by a sticky bar.
  *   z-[100] toasts
  * Maps get their own stacking context (index.css), so Leaflet's z-indexes in the
  * hundreds stay inside the map.
@@ -646,7 +647,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([t
  * opens (to a field marked autoFocus, else the dialog itself), Tab wraps round
  * inside it, and focus goes back to whatever opened it when it closes.
  */
-function useFocusTrap(open: boolean, box: React.RefObject<HTMLElement | null>) {
+function useFocusTrap(open: boolean, box: RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!open) return;
     const before = document.activeElement as HTMLElement | null;
@@ -680,17 +681,20 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   open: boolean; onClose: () => void; title: ReactNode; description?: ReactNode;
   children?: ReactNode; footer?: ReactNode; size?: "sm" | "md" | "lg" | "xl"; tone?: "danger";
 }) {
+  const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   useEscape(open, onClose);
+  useFocusTrap(open, panel);
   if (!open) return null;
   const width = { sm: "max-w-md", md: "max-w-xl", lg: "max-w-3xl", xl: "max-w-5xl" }[size];
   const danger = tone === "danger";
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="absolute inset-0 bg-mask/70" onClick={onClose} />
-      <div className={cx("relative flex max-h-[94dvh] w-full flex-col overflow-hidden bg-surface shadow-float sm:rounded-sm", width)}>
+      <div ref={panel} tabIndex={-1} className={cx("relative flex max-h-[94dvh] w-full flex-col overflow-hidden bg-surface shadow-float outline-none sm:rounded-sm", width)}>
         <div className={cx("flex shrink-0 items-start gap-3 px-5 pb-4 pt-5 sm:px-6", danger ? "bg-red" : "bg-surface")}>
           <div className="min-w-0 flex-1">
-            <h2 className="text-[22px] font-medium leading-7 text-white">{title}</h2>
+            <h2 id={titleId} className="text-[22px] font-medium leading-7 text-white">{title}</h2>
             {description && <p className={cx("mt-1 text-[15px] leading-6", danger ? "text-white/85" : "text-ink-3")}>{description}</p>}
           </div>
           <IconButton label="Close" onClick={onClose} className={cx("-mr-2 -mt-1", danger && "text-white hover:bg-white/10")}>

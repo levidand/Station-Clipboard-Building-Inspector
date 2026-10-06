@@ -136,9 +136,9 @@ export function BusinessPage({ id }: { id: number }) {
               label: d.website || d.email ? "Change the website or email" : "Add the website or email", icon: Globe,
               hint: "The logo is found on the website, so nobody has to upload one.", onClick: () => setDialog("website"),
             },
-            perms.inspect && !!(d.website || d.email) && !lookingForLogo && {
+            perms.inspect && !!d.logoSite && !lookingForLogo && {
               label: d.logoUrl ? "Look for a newer logo" : "Look for the logo", icon: RefreshCw,
-              hint: `Reads ${d.website ? siteLabel(d.website) : "the email's website"} again for it.`, onClick: () => findLogo.mutate(id),
+              hint: `Reads ${d.logoSite} again for it.`, onClick: () => findLogo.mutate(id),
             },
             perms.inspect && !!d.logoUrl && { label: "Remove the logo", icon: ImageOff, hint: "Shows the business's initials instead.", onClick: () => void removeLogo() },
             { label: "Print the business record", icon: Printer, hint: "The program, open violations and every inspection, on paper.", onClick: () => navigate(`/businesses/${id}/print`) },

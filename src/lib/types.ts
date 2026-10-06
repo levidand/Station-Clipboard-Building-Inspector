@@ -90,6 +90,8 @@ export interface PropertyDetail extends PropertyRow {
   email?: string | null; website?: string | null;
   /** The site the logo came from, or was last looked for on. */
   logoDomain?: string | null;
+  /** Where a logo would be looked for now: null with no website and only a personal email (Gmail and the like). */
+  logoSite?: string | null;
   preplan: {
     phone: string | null; emergencyContacts: PreplanContact[]; constructionType: string;
     floorsAbove: number | null; floorsBelow: number | null; squareFeet: number | null;

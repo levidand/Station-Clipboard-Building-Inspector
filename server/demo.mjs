@@ -331,6 +331,7 @@ export function demoRouter() {
     res.json({
       ...propertyRow(p, t), today: t,
       email: profiles.get(p.id)?.email ?? null, website: profiles.get(p.id)?.website ?? null, logoDomain: profiles.get(p.id)?.logoDomain ?? null,
+      logoSite: logoDomainOf(profiles.get(p.id)),
       frequencyMonths: prog?.frequencyMonths ?? null, effectiveFrequencyMonths: freqFor(prog),
       ownerName: prog?.ownerName ?? null, ownerPhone: prog?.ownerPhone ?? null, ownerEmail: prog?.ownerEmail ?? null,
       ownerMailingAddress: prog?.ownerMailingAddress ?? null, businessLicense: prog?.businessLicense ?? null, notes: prog?.notes ?? null,

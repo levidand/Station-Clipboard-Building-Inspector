@@ -159,7 +159,10 @@
 svg.lucide[stroke-width="2"] { stroke-width: 2.25px; }
 
 /* ── Leaflet, in the portal's skin ──────────────────────────── */
-.leaflet-container { background: #1c1c1c; font-family: var(--font-sans); }
+/* Leaflet's panes and buttons carry z-indexes of 400 to 1000. Its own stacking
+   context keeps them inside the map, so the title bar's menus, the Actions menu
+   and every drop-down open over a map instead of under it. */
+.leaflet-container { isolation: isolate; z-index: 0; background: #1c1c1c; font-family: var(--font-sans); }
 .leaflet-control-attribution { background: #303030cc !important; color: rgba(255,255,255,.6) !important; font-size: 11px; }
 .leaflet-control-attribution a { color: #64b5f6 !important; }
 .leaflet-bar { border-radius: 2px !important; border: 0 !important; box-shadow: 2px 2px 8px 0 rgba(0,0,0,.4) !important; }

@@ -1,6 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, ExternalLink, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  AlertTriangle, ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ExternalLink, RotateCw, Search,
+  SlidersHorizontal, X,
+} from "lucide-react";
 import { errorMessage, ApiError } from "@/lib/api";
 import { portalTarget, type PortalName } from "@/shared/departmentPortal";
 import {
@@ -86,32 +90,22 @@ export function ActionMenu({ sections, label = "Actions", size = "lg", variant =
   const [open, setOpen] = useState(false);
   /** A sheet from the bottom on a phone; a panel by the button from a tablet up. */
   const [sheet, setSheet] = useState(false);
-  /** Where the panel sits, relative to the button, once it has been measured. */
-  const [place, setPlace] = useState<{ top: number; left: number; maxHeight?: number } | null>(null);
-  const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const close = (refocus = false) => { setOpen(false); if (refocus) button.current?.focus(); };
   useEscape(open, () => close(true));
+  const place = useFloating(open && !sheet, button, panel, "end", () => close());
 
-  // Under the button when it fits, over it when that fits, otherwise slid up
-  // the screen until it does: it only scrolls when it's taller than the screen.
-  useLayoutEffect(() => {
-    const el = panel.current, b = button.current, w = wrap.current;
-    if (!open || sheet || !el || !b || !w) { setPlace(null); return; }
-    const p = floatPlace(b.getBoundingClientRect(), el.offsetWidth, el.offsetHeight, "end");
-    const at = w.getBoundingClientRect();
-    setPlace({ top: p.top - at.top, left: p.left - at.left, maxHeight: p.maxHeight });
-  }, [open, sheet]);
-
+  // Focus the first item once the panel is placed (a hidden element can't take focus).
+  const shown = open && (sheet || place != null);
   useEffect(() => {
-    if (open) panel.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus({ preventScroll: true });
-  }, [open]);
+    if (shown) panel.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus({ preventScroll: true });
+  }, [shown]);
 
-  const shown = sections
+  const groups = sections
     .map(s => ({ title: s.title, items: s.items.filter((a): a is ActionItem => !!a) }))
     .filter(s => s.items.length > 0);
-  if (shown.length === 0) return null;
+  if (groups.length === 0) return null;
 
   function toggle() {
     if (open) { setOpen(false); return; }
@@ -119,31 +113,36 @@ export function ActionMenu({ sections, label = "Actions", size = "lg", variant =
     setOpen(true);
   }
 
-  function arrows(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    e.preventDefault();
+  function keys(e: KeyboardEvent<HTMLDivElement>) {
+    // Tab leaves the menu the way it came in: back to the button, then on to whatever's next.
+    if (e.key === "Tab") { close(true); return; }
     const items = [...(panel.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
     const at = items.indexOf(document.activeElement as HTMLElement);
-    items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+    const to = e.key === "ArrowDown" ? (at + 1) % items.length
+      : e.key === "ArrowUp" ? (at + items.length - 1) % items.length
+        : e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    items[to]?.focus();
   }
 
   return (
-    <div ref={wrap} className="relative">
+    <>
       <Button ref={button} variant={variant} size={size} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
         {label}<ChevronDown className={cx(size === "sm" ? "h-4 w-4" : "h-5 w-5", "transition-transform", open && "rotate-180")} />
       </Button>
-      {open && (
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-40 bg-mask/70 sm:bg-transparent" onClick={() => close()} />
+          <div className="fixed inset-0 z-[60] bg-mask/70 sm:bg-transparent" onClick={() => close()} />
           <div
-            ref={panel} role="menu" aria-label={label} onKeyDown={arrows}
+            ref={panel} role="menu" aria-label={label} onKeyDown={keys}
             style={sheet ? undefined : place ?? { top: 0, left: 0, visibility: "hidden" }}
             className={cx(
-              "z-50 overflow-y-auto bg-surface shadow-float",
+              "fixed z-[60] overflow-y-auto bg-surface text-ink shadow-float",
               sheet
-                ? "fixed inset-x-0 bottom-0 max-h-[85dvh] pb-2"
+                ? "inset-x-0 bottom-0 max-h-[85dvh] pb-2"
                 // As wide as its longest line, within reason: two short items don't get a 26rem slab.
-                : "absolute w-max min-w-64 max-w-[min(26rem,calc(100vw-16px))] rounded-sm border border-divider",
+                : "w-max min-w-64 max-w-[min(26rem,calc(100vw-16px))] rounded-sm border border-divider",
             )}
           >
             {sheet && (
@@ -152,17 +151,46 @@ export function ActionMenu({ sections, label = "Actions", size = "lg", variant =
                 <IconButton label="Close" onClick={() => close(true)}><X className="h-6 w-6" /></IconButton>
               </div>
             )}
-            {shown.map((s, i) => (
+            {groups.map((s, i) => (
               <div key={s.title ?? i} className={cx("py-1", i > 0 && "border-t border-divider")}>
                 {s.title && <div className="px-4 pb-0.5 pt-2 text-[13px] font-medium uppercase tracking-[0.06em] text-ink-3">{s.title}</div>}
                 {s.items.map(a => <ActionRow key={a.label} a={a} onDone={() => close()} />)}
               </div>
             ))}
           </div>
-        </>
+        </>,
+        document.body,
       )}
-    </div>
+    </>
   );
+}
+
+/**
+ * Places a floating panel by its button, in screen coordinates (see
+ * floatPlace): under it if it fits, over it if that fits, otherwise slid up
+ * the screen. The panel lives on <body>, so if the page scrolls or the window
+ * changes size it would be left behind: it closes instead.
+ */
+function useFloating(
+  open: boolean, anchor: RefObject<HTMLElement | null>, panel: RefObject<HTMLElement | null>, align: "start" | "end", onLost: () => void,
+) {
+  const [place, setPlace] = useState<{ top: number; left: number; maxHeight?: number } | null>(null);
+  const lost = useRef(onLost);
+  lost.current = onLost;
+  useLayoutEffect(() => {
+    const el = panel.current, b = anchor.current;
+    if (!open || !el || !b) { setPlace(null); return; }
+    setPlace(floatPlace(b.getBoundingClientRect(), el.offsetWidth, el.offsetHeight, align));
+  }, [open, anchor, panel, align]);
+  useEffect(() => {
+    if (!open) return;
+    const onScroll = (e: Event) => { if (!panel.current?.contains(e.target as Node)) lost.current(); };
+    const onResize = () => lost.current();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", onResize); };
+  }, [open, panel]);
+  return place;
 }
 
 function ActionRow({ a, onDone }: { a: ActionItem; onDone: () => void }) {
@@ -186,18 +214,18 @@ function ActionRow({ a, onDone }: { a: ActionItem; onDone: () => void }) {
 }
 
 /**
- * A titled group of rows. `actions` sit on the right of the title. An `id`
- * lets something higher up the page jump to it; the margin keeps its title
- * clear of the sticky PageHead.
+ * A titled group of rows. `actions` sit on the right of the title, centred on
+ * it. An `id` lets something higher up the page jump to it; the margin keeps
+ * its title clear of the sticky PageHead (which sticks from a tablet up).
  */
 export function Group({ title, actions, hint, children, className, id }: {
   title: ReactNode; actions?: ReactNode; hint?: ReactNode; children: ReactNode; className?: string; id?: string;
 }) {
   return (
-    <section id={id} className={cx(id && "scroll-mt-40", className)}>
-      <div className="mb-2 flex min-h-10 items-end justify-between gap-3">
+    <section id={id} className={cx("scroll-mt-4 md:scroll-mt-40", className)}>
+      <div className={cx("mb-2.5 flex items-center justify-between gap-3", actions && "min-h-11")}>
         <h2 className={GROUP_TITLE}>{title}</h2>
-        {actions && <div className="-mb-1 flex shrink-0 flex-wrap justify-end gap-2">{actions}</div>}
+        {actions && <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div>}
       </div>
       {children}
       {hint && <p className="mt-2 text-[14px] leading-5 text-ink-3">{hint}</p>}
@@ -208,6 +236,113 @@ export function Group({ title, actions, hint, children, className, id }: {
 /** The bordered box rows sit in. */
 export function Box({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx("border border-faded bg-odd", className)}>{children}</div>;
+}
+
+// ---------------------------------------------------------------------------
+// Paging
+// ---------------------------------------------------------------------------
+
+/** Rows on one page of a list. Long enough to scan, short enough to reach the arrows. */
+export const PAGE_SIZE = 25;
+
+export interface Paged<T> {
+  /** This page's rows. */
+  rows: T[];
+  /** From 0. */
+  page: number;
+  pages: number;
+  total: number;
+  size: number;
+  setPage: (page: number) => void;
+}
+
+/**
+ * One page of a list. A new `resetKey` (the search and filters, joined into a
+ * string) goes back to the first page, so a narrower list never opens on an
+ * empty page 4. If rows go away and the page runs off the end, it shows the
+ * last page instead.
+ */
+export function usePaged<T>(rows: T[], size: number = PAGE_SIZE, resetKey?: string | number): Paged<T> {
+  const [page, setPage] = useState(0);
+  const [key, setKey] = useState(resetKey);
+  if (key !== resetKey) { setKey(resetKey); setPage(0); }
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  const at = Math.min(page, pages - 1);
+  return { rows: rows.slice(at * size, (at + 1) * size), page: at, pages, total: rows.length, size, setPage };
+}
+
+/**
+ * The arrows under a list that runs to more than one page: first, previous,
+ * next and last, the page it's on, and which rows are showing. A long list
+ * gets a box to jump straight to a page. `attached` draws it as the foot of
+ * the Box above it. Nothing shows when everything fits on one page.
+ */
+export function Pager({ page, pages, total, size, setPage, attached }: Omit<Paged<unknown>, "rows"> & { attached?: boolean }) {
+  const root = useRef<HTMLDivElement>(null);
+  if (pages <= 1) return null;
+  const from = page * size + 1, to = Math.min(total, (page + 1) * size);
+
+  function go(p: number) {
+    setPage(Math.max(0, Math.min(pages - 1, p)));
+    // Back up to the top of the list when it has scrolled away, so the new page reads from its first row.
+    const list = root.current?.closest("section") ?? root.current?.parentElement;
+    requestAnimationFrame(() => { if (list && list.getBoundingClientRect().top < 140) list.scrollIntoView({ block: "start" }); });
+  }
+
+  const arrow = "h-11 w-11 shrink-0 px-0";
+  return (
+    <nav
+      ref={root} aria-label="Pages"
+      className={cx(
+        "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-faded bg-alt px-3 py-2 sm:px-4",
+        attached ? "border-t-0" : "mt-3",
+      )}
+    >
+      <p className="text-[15px] text-ink-2" aria-live="polite">
+        Showing <span className="font-medium text-ink">{from}–{to}</span> of <span className="font-medium text-ink">{total.toLocaleString()}</span>
+      </p>
+      <div className="flex items-center gap-1.5">
+        <Button variant="ghost" className={arrow} aria-label="First page" title="First page" disabled={page === 0} onClick={() => go(0)}>
+          <ChevronsLeft className="h-6 w-6" />
+        </Button>
+        <Button variant="secondary" className="h-11 px-2.5 sm:px-3" aria-label="Previous page" title="Previous page" disabled={page === 0} onClick={() => go(page - 1)}>
+          <ChevronLeft className="h-6 w-6" /><span className="hidden sm:inline">Previous</span>
+        </Button>
+        {pages > 4 ? (
+          <span className="flex items-center gap-2 px-1 text-[15px] text-ink-2">
+            <span className="hidden sm:inline">Page</span>
+            <Select value={page} onChange={e => go(Number(e.target.value))} aria-label="Go to page" className="h-11 w-auto min-w-[4.5rem] text-[16px]">
+              {Array.from({ length: pages }, (_, i) => <option key={i} value={i}>{i + 1}</option>)}
+            </Select>
+            of {pages}
+          </span>
+        ) : (
+          <span className="whitespace-nowrap px-2 text-[15px] text-ink-2">
+            <span className="hidden sm:inline">Page </span><span className="font-medium text-ink">{page + 1}</span> of {pages}
+          </span>
+        )}
+        <Button variant="secondary" className="h-11 px-2.5 sm:px-3" aria-label="Next page" title="Next page" disabled={page >= pages - 1} onClick={() => go(page + 1)}>
+          <span className="hidden sm:inline">Next</span><ChevronRight className="h-6 w-6" />
+        </Button>
+        <Button variant="ghost" className={arrow} aria-label="Last page" title="Last page" disabled={page >= pages - 1} onClick={() => go(pages - 1)}>
+          <ChevronsRight className="h-6 w-6" />
+        </Button>
+      </div>
+    </nav>
+  );
+}
+
+/** A Box of rows with the Pager at its foot: the usual list. */
+export function PagedBox<T>({ rows, render, size, resetKey, className }: {
+  rows: T[]; render: (row: T, index: number) => ReactNode; size?: number; resetKey?: string | number; className?: string;
+}) {
+  const p = usePaged(rows, size, resetKey);
+  return (
+    <>
+      <Box className={className}>{p.rows.map(render)}</Box>
+      <Pager {...p} attached />
+    </>
+  );
 }
 
 /** One row inside a box: rows divide, the last one doesn't. */
@@ -352,53 +487,74 @@ export function FilterBar({ search, filters }: {
   filters: FilterDef<any>[];
 }) {
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
-  useEscape(open, () => setOpen(false));
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const close = (refocus = false) => { setOpen(false); if (refocus) button.current?.focus(); };
+  useEscape(open, () => close(true));
+  const place = useFloating(open && !sheet, button, panel, "end", () => close());
   const on = filters.filter(f => f.value !== f.empty);
   const labelOf = (f: FilterDef) => f.options.find(o => o.value === f.value)?.label ?? f.value;
 
+  // The first choice takes the keyboard once the panel is placed (it's hidden while it's measured).
+  const shown = open && (sheet || place != null);
+  useEffect(() => {
+    if (shown) panel.current?.querySelector<HTMLElement>("[aria-haspopup=listbox]")?.focus({ preventScroll: true });
+  }, [shown]);
+
   function show() {
     setDraft(filters.map(f => f.value));
+    setSheet(window.innerWidth < 640);
     setOpen(true);
   }
   function apply() {
     filters.forEach((f, i) => { if (draft[i] !== f.value) f.onChange(draft[i]); });
-    setOpen(false);
+    close(true);
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
         <SearchBox {...search} className="min-w-0 max-w-xl flex-1" />
-        <div className="relative ml-auto shrink-0">
-          <Button size="lg" aria-haspopup="dialog" aria-expanded={open} onClick={() => (open ? setOpen(false) : show())}>
-            <SlidersHorizontal className="h-5 w-5" />Filters
-            {on.length > 0 && <Count>{on.length}</Count>}
-          </Button>
-          {open && (
-            <>
-              <div className="fixed inset-0 z-40 bg-mask/70 sm:bg-transparent" onClick={() => setOpen(false)} />
-              {/* A sheet from the bottom on a phone, a panel under the button from a tablet up. */}
-              <div role="dialog" aria-label="Filters" className="fixed inset-x-0 bottom-0 z-50 bg-surface shadow-float sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[26rem] sm:rounded-sm sm:border sm:border-divider">
-                <div className="space-y-5 px-5 py-5">
-                  <h2 className="text-[20px] font-medium leading-7 text-white">Filters</h2>
-                  {filters.map((f, i) => (
-                    <Field key={f.label} label={f.label}>
-                      <Select autoFocus={i === 0} value={draft[i]} onChange={e => setDraft(d => d.map((v, j) => (j === i ? e.target.value : v)))}>
-                        {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </Select>
-                    </Field>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 border-t border-divider px-5 py-3.5">
-                  <Button variant="ghost" onClick={() => setDraft(filters.map(f => f.empty))}>Reset</Button>
-                  <Button variant="ghost" className="ml-auto" onClick={() => setOpen(false)}>Cancel</Button>
-                  <Button variant="primary" onClick={apply}>Apply filters</Button>
-                </div>
+        <Button
+          ref={button} size="lg" aria-haspopup="dialog" aria-expanded={open} aria-label={on.length ? `Filters, ${on.length} on` : "Filters"}
+          onClick={() => (open ? close() : show())} className="ml-auto shrink-0 px-3 sm:px-5"
+        >
+          <SlidersHorizontal className="h-5 w-5" /><span className="hidden sm:inline">Filters</span>
+          {on.length > 0 && <Count>{on.length}</Count>}
+        </Button>
+        {open && createPortal(
+          <>
+            <div className="fixed inset-0 z-[60] bg-mask/70 sm:bg-transparent" onClick={() => close()} />
+            {/* A sheet from the bottom on a phone, a panel under the button from a tablet up. */}
+            <div
+              ref={panel} role="dialog" aria-label="Filters"
+              style={sheet ? undefined : place ?? { top: 0, left: 0, visibility: "hidden" }}
+              className={cx(
+                "fixed z-[60] overflow-y-auto bg-surface text-ink shadow-float",
+                sheet ? "inset-x-0 bottom-0 max-h-[90dvh]" : "w-[min(26rem,calc(100vw-16px))] rounded-sm border border-divider",
+              )}
+            >
+              <div className="space-y-5 px-5 py-5">
+                <h2 className="text-[20px] font-medium leading-7 text-white">Filters</h2>
+                {filters.map((f, i) => (
+                  <Field key={f.label} label={f.label}>
+                    <Select value={draft[i]} onChange={e => setDraft(d => d.map((v, j) => (j === i ? e.target.value : v)))}>
+                      {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </Select>
+                  </Field>
+                ))}
               </div>
-            </>
-          )}
-        </div>
+              <div className="flex items-center gap-2 border-t border-divider px-5 py-3.5">
+                <Button variant="ghost" onClick={() => setDraft(filters.map(f => f.empty))}>Reset</Button>
+                <Button variant="ghost" className="ml-auto" onClick={() => close(true)}>Cancel</Button>
+                <Button variant="primary" onClick={apply}>Apply filters</Button>
+              </div>
+            </div>
+          </>,
+          document.body,
+        )}
       </div>
       {on.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">

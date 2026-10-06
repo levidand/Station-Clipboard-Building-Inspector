@@ -179,9 +179,9 @@ export function MapPage() {
         <span className="inline-flex items-center"><Key svg={KEY.hydrantOut} />Hydrant out of service</span>
         {counts.draftSites > 0 && <span className="inline-flex items-center"><Key svg={KEY.draftSite} />Draft site</span>}
       </div>
-      <div className="relative min-h-0 flex-1">
+      <div className="relative isolate min-h-0 flex-1">
         <div ref={el} className="absolute inset-0" />
-        {!data && <div className="absolute inset-0 z-[500] bg-surface/80"><QueryState query={q}>{null}</QueryState></div>}
+        {!data && <div className="absolute inset-0 z-10 bg-surface/80"><QueryState query={q}>{null}</QueryState></div>}
       </div>
     </div>
   );
