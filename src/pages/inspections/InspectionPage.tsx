@@ -304,9 +304,12 @@ export function InspectionPage({ id }: { id: number }) {
               <Field label="Name"><Input value={draft.contactName} onChange={e => edit({ contactName: e.target.value })} /></Field>
               <Field label="Title or role"><Input value={draft.contactTitle} onChange={e => edit({ contactTitle: e.target.value })} placeholder="Manager, owner" /></Field>
             </div>
-            <Field label="Signature">
+            {/* Not a <Field>: that's a <label>, and a click anywhere in a label
+                presses its first button, which here is "Clear the signature". */}
+            <div>
+              <span className="mb-1.5 block text-[15px] font-medium text-ink">Signature</span>
               <SignaturePad value={draft.signature} onChange={sig => edit({ signature: sig, signedName: draft.signedName || draft.contactName })} />
-            </Field>
+            </div>
           </div>
         ) : (
           <Box>

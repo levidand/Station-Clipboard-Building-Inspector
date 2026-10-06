@@ -49,6 +49,8 @@ export function EventPage({ id }: { id: number }) {
   };
   const setStatus = (status: EventStatus, done: string) => patch({ status }, done);
   const ended = new Date(d.endsAt).getTime() < Date.now();
+  // Walk-throughs and permits are booked while it's still ahead.
+  const planning = (d.status === "planning" || d.status === "approved") && !ended;
   const short = d.crowdManagersNeeded > 0 && (d.crowdManagers ?? 0) < d.crowdManagersNeeded;
   const tasksDone = d.tasks.filter(t => t.done).length;
 
@@ -62,8 +64,8 @@ export function EventPage({ id }: { id: number }) {
       >
         {can && d.status === "planning" && <Button variant="ok" size="lg" onClick={() => setStatus("approved", "Approved")}><ThumbsUp className="h-5 w-5" />Approve</Button>}
         {can && (d.status === "approved" || d.status === "planning") && ended && <Button variant="primary" size="lg" onClick={() => setStatus("completed", "Marked done")}><CheckCircle2 className="h-5 w-5" />Mark done</Button>}
-        {perms.inspect && d.status !== "cancelled" && <Button size="lg" onClick={() => setDialog("walk")}><ClipboardPlus className="h-5 w-5" />Schedule a walk-through</Button>}
-        {perms.permits && d.permits.length === 0 && d.status !== "cancelled" && <Button size="lg" onClick={() => setDialog("permit")}><Stamp className="h-5 w-5" />Event permit</Button>}
+        {perms.inspect && planning && <Button size="lg" onClick={() => setDialog("walk")}><ClipboardPlus className="h-5 w-5" />Schedule a walk-through</Button>}
+        {perms.permits && d.permits.length === 0 && planning && <Button size="lg" onClick={() => setDialog("permit")}><Stamp className="h-5 w-5" />Event permit</Button>}
         {can && (
           <div className="relative">
             <Button size="lg" variant="ghost" onClick={() => setMenu(m => !m)} aria-label="More"><MoreHorizontal className="h-6 w-6" /></Button>

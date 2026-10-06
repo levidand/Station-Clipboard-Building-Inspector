@@ -28,7 +28,7 @@ export const toast = {
   waiting: (m: string) => push("waiting", m),
 };
 
-/** Snackbars along the bottom: the tooltip surface for confirmations, alert red for errors. */
+/** Messages at the top, under the title bar, clear of dialog buttons: grey for confirmations, alert red for errors. */
 export function Toaster() {
   const [items, setItems] = useState<Toast[]>(toasts);
   useEffect(() => {
@@ -36,7 +36,7 @@ export function Toaster() {
     return () => { listeners = listeners.filter(l => l !== setItems); };
   }, []);
   return (
-    <div className="pointer-events-none fixed bottom-4 left-1/2 z-[100] flex w-[min(92vw,480px)] -translate-x-1/2 flex-col gap-2">
+    <div className="pointer-events-none fixed top-[68px] left-1/2 z-[100] flex w-[min(92vw,480px)] -translate-x-1/2 flex-col gap-2">
       {items.map(t => (
         <div
           key={t.id}
