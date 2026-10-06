@@ -68,10 +68,12 @@ export const NO_PLACE: Place = { preplanId: null, placeName: null, address: null
  * house, a lot or a construction site isn't one, so an address can be typed
  * instead, and looked up on the map.
  */
-export function PlacePicker({ value, onChange, allowAddress = true, label = "Where" }: {
-  value: Place; onChange: (p: Place) => void; allowAddress?: boolean; label?: string;
+export function PlacePicker({ value, onChange, allowAddress = true, addressOnly = false, label = "Where" }: {
+  value: Place; onChange: (p: Place) => void; allowAddress?: boolean; addressOnly?: boolean; label?: string;
 }) {
-  const [mode, setMode] = useState<"business" | "address">(value.preplanId || !allowAddress ? "business" : value.address ? "address" : "business");
+  const [mode, setMode] = useState<"business" | "address">(
+    addressOnly ? "address" : value.preplanId || !allowAddress ? "business" : value.address ? "address" : "business",
+  );
   const [q, setQ] = useState("");
   const props = useQuery({
     queryKey: keys.properties,
@@ -105,7 +107,7 @@ export function PlacePicker({ value, onChange, allowAddress = true, label = "Whe
   return (
     <div className="space-y-3">
       <span className="block text-[15px] font-medium text-ink">{label}</span>
-      {allowAddress && (
+      {allowAddress && !addressOnly && (
         <Segmented
           value={mode}
           onChange={m => { setMode(m); onChange(NO_PLACE); }}
@@ -159,9 +161,11 @@ export function PlacePicker({ value, onChange, allowAddress = true, label = "Whe
             </div>
           </Field>
           {value.latitude != null && <Note>On the map at {value.latitude.toFixed(5)}, {value.longitude?.toFixed(5)}.</Note>}
-          <Field label="Name of the place (optional)" hint="A business name, a subdivision and lot, or a landmark.">
-            <Input value={value.placeName ?? ""} onChange={e => onChange({ ...value, placeName: e.target.value })} />
-          </Field>
+          {!addressOnly && (
+            <Field label="Name of the place (optional)" hint="A business name, a subdivision and lot, or a landmark.">
+              <Input value={value.placeName ?? ""} onChange={e => onChange({ ...value, placeName: e.target.value })} />
+            </Field>
+          )}
         </div>
       )}
     </div>
