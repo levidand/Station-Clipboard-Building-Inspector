@@ -209,6 +209,29 @@ export function Checkbox({ checked, onChange, children, className, disabled }: {
   );
 }
 
+/** A whole row that ticks on and off: a big box, the words, and who ticked it. */
+export function CheckGlyphButton({ checked, onClick, label, detail, disabled }: {
+  checked: boolean; onClick: () => void; label: string; detail?: string; disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button" role="checkbox" aria-checked={checked} disabled={disabled} onClick={onClick}
+      className="flex min-h-14 min-w-0 flex-1 items-center gap-4 px-4 py-2.5 text-left transition-colors hover:bg-hover disabled:cursor-default disabled:hover:bg-transparent"
+    >
+      <span className={cx(
+        "flex h-7 w-7 shrink-0 items-center justify-center rounded-[3px] border-2 transition-colors",
+        checked ? "border-lightgreen bg-lightgreen text-surface" : "border-ink-3",
+      )}>
+        {checked && <Check className="h-5 w-5" strokeWidth={3.5} />}
+      </span>
+      <span className="min-w-0">
+        <span className={cx("block text-[17px] leading-6", checked ? "text-ink-3 line-through" : "text-ink")}>{label}</span>
+        {detail && <span className="block text-[14px] text-ink-3">{detail}</span>}
+      </span>
+    </button>
+  );
+}
+
 /**
  * Big navy choices. The chosen one fills with its tone (blue unless the choice
  * carries a meaning of its own: green for Pass, red for Fail).
