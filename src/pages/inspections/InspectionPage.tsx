@@ -14,7 +14,7 @@ import type { ChecklistAnswer, InspectionDetail, Listed, Violation } from "@/lib
 import {
   Badge, Button, Checkbox, Field, Input, Modal, MoneyInput, Segmented, Select, Textarea,
 } from "@/components/ui";
-import { Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
+import { ActionMenu, Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
 import {
   FilesPanel, HistoryPanel, InspectionListRow, PersonSelect, ScheduleDialog, ViolationLine,
 } from "@/components/records";
@@ -171,6 +171,16 @@ export function InspectionPage({ id }: { id: number }) {
   const late = !done && d.status !== "cancelled" && !!d.scheduledOn && d.scheduledOn < d.today;
   const openWritten = d.violations.filter(v => v.status === "open");
   const stillOpenCarried = carried.filter(v => !cleared.includes(v.id));
+  const start = () => void act("start", () => api("POST", `${BASE}/inspections/${id}/start`), "Started. Work down the checklist.");
+  const reopen = () => {
+    if (window.confirm("Reopen this inspection so it can be changed? Violations it wrote stay as they are.")) {
+      void act("reopen", () => api("POST", `${BASE}/inspections/${id}/reopen`), "Reopened");
+    }
+  };
+  const markFixed = (v: Violation) => act(`fix-${v.id}`, async () => {
+    await api("PATCH", `${BASE}/violations/${v.id}`, { status: "corrected", resolutionNote: active ? "Corrected on site" : "Corrected" });
+    await qc.invalidateQueries({ queryKey: keys.inspection(id) });
+  }, "Marked corrected");
 
   return (
     <div className={PAGE}>
@@ -183,33 +193,32 @@ export function InspectionPage({ id }: { id: number }) {
           {active && <SaveState state={saveState} />}
         </>}
       >
-        {perms.inspect && d.status === "scheduled" && <>
-          <Button variant="ok" size="lg" loading={busy === "start"} onClick={() => act("start", () => api("POST", `${BASE}/inspections/${id}/start`), "Started. Work down the checklist.")}>
-            <Play className="h-5 w-5" />Start inspection
-          </Button>
-          <Button size="lg" onClick={() => setEditingDetails(true)}><CalendarClock className="h-5 w-5" />Change day or inspector</Button>
-          <Button size="lg" variant="decline" onClick={() => setCancelling(true)}><Ban className="h-5 w-5" />Cancel it</Button>
-        </>}
-        {editable && <>
-          <Button variant="ok" size="lg" onClick={() => setFinishing(true)}><CheckCircle2 className="h-5 w-5" />Finish inspection</Button>
-          <Button size="lg" onClick={() => setViolationFor({ start: null })}><FilePlus2 className="h-5 w-5" />Write a violation</Button>
-        </>}
-        {done && <>
-          <Button variant="primary" size="lg" onClick={() => navigate(`/inspections/${id}/report`)}><Printer className="h-5 w-5" />Print the report</Button>
-          {d.violations.length > 0 && <Button size="lg" onClick={() => navigate(`/inspections/${id}/notice`)}><Printer className="h-5 w-5" />Print the notice</Button>}
-          {perms.inspect && <Button size="lg" onClick={() => setRebooking(true)}><ClipboardPlus className="h-5 w-5" />Book a re-inspection</Button>}
-        </>}
-        {perms.inspect && (done || d.status === "cancelled") && (
-          <Button size="lg" variant="ghost" loading={busy === "reopen"}
-            onClick={() => { if (window.confirm("Reopen this inspection so it can be changed? Violations it wrote stay as they are.")) void act("reopen", () => api("POST", `${BASE}/inspections/${id}/reopen`), "Reopened"); }}>
-            <RotateCcw className="h-5 w-5" />Reopen
-          </Button>
-        )}
+        <ActionMenu sections={[
+          { title: "Next step", items: [
+            perms.inspect && d.status === "scheduled" && { label: "Start inspection", icon: Play, tone: "ok", hint: "Opens the checklist. Everything is saved as you go.", onClick: start },
+            editable && { label: "Finish inspection", icon: CheckCircle2, tone: "ok", hint: "Pick the result, and book a re-inspection if it needs one.", onClick: () => setFinishing(true) },
+            editable && { label: "Write a violation", icon: FilePlus2, tone: "warn", hint: "One that isn't on the checklist.", onClick: () => setViolationFor({ start: null }) },
+            done && perms.inspect && { label: "Book a re-inspection", icon: ClipboardPlus, tone: "brand", hint: "Comes back to check the violations are fixed.", onClick: () => setRebooking(true) },
+          ] },
+          { title: "Print", items: [
+            done && { label: "Print the report", icon: Printer, hint: "What was checked and found, to leave with the business.", onClick: () => navigate(`/inspections/${id}/report`) },
+            done && d.violations.length > 0 && { label: "Print the notice", icon: Printer, hint: "The violation notice, with the dates to fix them by.", onClick: () => navigate(`/inspections/${id}/notice`) },
+          ] },
+          { items: [
+            perms.inspect && d.status === "scheduled" && { label: "Change the day or inspector", icon: CalendarClock, onClick: () => setEditingDetails(true) },
+            perms.inspect && (done || d.status === "cancelled") && { label: "Reopen", icon: RotateCcw, hint: "So it can be changed. Violations it wrote stay as they are.", onClick: reopen },
+            perms.inspect && d.status === "scheduled" && { label: "Cancel the inspection", icon: Ban, danger: true, onClick: () => setCancelling(true) },
+            perms.settings && { label: "Delete the inspection", icon: Trash2, danger: true, onClick: () => setDeleting(true) },
+          ] },
+        ]} />
       </PageHead>
 
       {d.status === "scheduled" && (
-        <div className="border border-sky/40 bg-sky/10 px-4 py-3 text-[16px] leading-6">
-          When you get there, press <b>Start inspection</b>. The checklist below opens up, and everything you enter is saved as you go.
+        <div className="flex flex-col gap-3 border border-sky/40 bg-sky/10 px-4 py-3 sm:flex-row sm:items-center">
+          <p className="flex-1 text-[16px] leading-6">
+            When you get there, start the inspection. The checklist below opens up, and everything you enter is saved as you go.
+          </p>
+          {perms.inspect && <Button variant="ok" size="lg" loading={busy === "start"} onClick={start}><Play className="h-5 w-5" />Start inspection</Button>}
         </div>
       )}
 
@@ -273,13 +282,12 @@ export function InspectionPage({ id }: { id: number }) {
         {d.violations.length === 0 ? <Note>None.</Note> : (
           <Box>
             {d.violations.map(v => (
-              <ViolationLine key={v.id} v={v} action={perms.inspect && v.status === "open" ? <>
-                <Button size="sm" onClick={() => setViolationFor({ start: violationDraft(v), editing: v })}><Pencil className="h-4 w-4" />Edit</Button>
-                <Button size="sm" variant="ok" onClick={() => act(`fix-${v.id}`, async () => {
-                  await api("PATCH", `${BASE}/violations/${v.id}`, { status: "corrected", resolutionNote: active ? "Corrected on site" : "Corrected" });
-                  await qc.invalidateQueries({ queryKey: keys.inspection(id) });
-                }, "Marked corrected")}>Fixed</Button>
-              </> : undefined} />
+              <ViolationLine key={v.id} v={v} action={perms.inspect && v.status === "open" ? (
+                <ActionMenu size="sm" variant="secondary" sections={[{ items: [
+                  { label: "It's fixed", icon: CheckCircle2, tone: "ok", hint: active ? "Corrected on site, while you're here." : "Marks it corrected.", onClick: () => void markFixed(v) },
+                  { label: "Edit the violation", icon: Pencil, onClick: () => setViolationFor({ start: violationDraft(v), editing: v }) },
+                ] }]} />
+              ) : undefined} />
             ))}
           </Box>
         )}
@@ -321,6 +329,15 @@ export function InspectionPage({ id }: { id: number }) {
         )}
       </Group>
 
+      {editable && (
+        <div className="flex flex-col gap-3 border border-green/50 bg-green/10 px-4 py-3 sm:flex-row sm:items-center">
+          <p className="flex-1 text-[16px] leading-6">
+            Walked the whole building? Finish the inspection to pick the result, close out what was fixed, and book a re-inspection if it needs one.
+          </p>
+          <Button variant="ok" size="lg" onClick={() => setFinishing(true)}><CheckCircle2 className="h-5 w-5" />Finish inspection</Button>
+        </div>
+      )}
+
       <FeeBox d={d} canEdit={perms.inspect} onSaved={next => qc.setQueryData(keys.inspection(id), next)} />
 
       {d.reinspections.length > 0 && (
@@ -333,12 +350,6 @@ export function InspectionPage({ id }: { id: number }) {
         <HistoryPanel history={d.history} kind="inspections" id={id} canWrite={perms.inspect}
           onChange={h => qc.setQueryData<InspectionDetail>(keys.inspection(id), cur => (cur ? { ...cur, history: h } : cur))} />
       </Group>
-
-      {perms.settings && (
-        <div className="border-t border-divider pt-6">
-          <Button variant="decline" onClick={() => setDeleting(true)}><Trash2 className="h-5 w-5" />Delete this inspection</Button>
-        </div>
-      )}
 
       <ViolationDialog
         open={!!violationFor} onClose={() => setViolationFor(null)}
@@ -393,37 +404,65 @@ function SaveState({ state }: { state: "saved" | "waiting" | "saving" | "error" 
 
 function FeeBox({ d, canEdit, onSaved }: { d: InspectionDetail; canEdit: boolean; onSaved: (d: InspectionDetail) => void }) {
   const settings = useSettings();
+  const schedule = settings.data?.fees ?? [];
   const [fee, setFee] = useState<number | null>(d.feeCents);
   const [paid, setPaid] = useState(d.feePaid);
+  // Which line of the fee schedule the amount came from. Not stored on the
+  // inspection, so it's worked out from the amount when the page opens.
+  const [feeKey, setFeeKey] = useState("");
   const [busy, setBusy] = useState(false);
-  const changed = fee !== d.feeCents || paid !== d.feePaid;
+  // Follow the saved fee when it changes underneath (saved here, or by someone else).
+  const [seen, setSeen] = useState<string | null>(null);
+  const stamp = `${d.feeCents}:${d.feePaid}:${schedule.length}`;
+  if (stamp !== seen) {
+    setSeen(stamp);
+    setFee(d.feeCents);
+    setPaid(d.feePaid);
+    setFeeKey(schedule.find(f => f.amountCents === d.feeCents)?.key ?? "");
+  }
+  // Nothing to pay without an amount.
+  const noFee = !fee;
+  const paidNow = paid && !noFee;
+  const changed = fee !== d.feeCents || paidNow !== d.feePaid;
+  function amount(cents: number | null) {
+    setFee(cents);
+    if (schedule.find(f => f.key === feeKey)?.amountCents !== cents) setFeeKey("");
+    if (!cents) setPaid(false);
+  }
   if (!canEdit && d.feeCents == null) return null;
   return (
     <Group title="Fee">
       <Box>
         <Row>
           {canEdit ? (
-            <div className="flex flex-wrap items-end gap-4">
-              <Field label="Amount">
-                <MoneyInput cents={fee} onChange={setFee} />
-              </Field>
-              {(settings.data?.fees.length ?? 0) > 0 && (
-                <Field label="From the fee schedule">
-                  <Select value="" onChange={e => { const f = settings.data!.fees.find(x => x.key === e.target.value); if (f) setFee(f.amountCents); }} className="w-auto min-w-64">
-                    <option value="">Pick a fee…</option>
-                    {settings.data!.fees.map(f => <option key={f.key} value={f.key}>{f.label} ({money(f.amountCents)})</option>)}
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-4">
+              {schedule.length > 0 && (
+                <Field label="Fee schedule">
+                  <Select
+                    value={feeKey} placeholder="Pick a fee…" className="w-auto min-w-64"
+                    onChange={e => {
+                      const f = schedule.find(x => x.key === e.target.value);
+                      if (f) { setFeeKey(f.key); setFee(f.amountCents); }
+                    }}
+                  >
+                    {schedule.map(f => <option key={f.key} value={f.key}>{f.label} ({money(f.amountCents)})</option>)}
                   </Select>
                 </Field>
               )}
-              <Checkbox checked={paid} onChange={setPaid}>Paid</Checkbox>
+              <Field label="Amount">
+                <MoneyInput cents={fee} onChange={amount} />
+              </Field>
+              <Checkbox checked={paidNow} onChange={setPaid} disabled={noFee} className="h-12">Paid</Checkbox>
               <Button variant="primary" disabled={!changed} loading={busy} onClick={async () => {
                 setBusy(true);
-                try { onSaved(await api<InspectionDetail>("PATCH", `${BASE}/inspections/${d.id}`, { feeCents: fee, feePaid: paid })); toast.success("Fee saved"); }
+                try { onSaved(await api<InspectionDetail>("PATCH", `${BASE}/inspections/${d.id}`, { feeCents: fee, feePaid: paidNow })); toast.success(paidNow ? "Fee saved, marked paid" : "Fee saved"); }
                 catch (err) { toast.error(errorMessage(err)); } finally { setBusy(false); }
               }}><Save className="h-4 w-4" />Save fee</Button>
             </div>
           ) : (
-            <p className="text-[17px]">{money(d.feeCents)} · {d.feePaid ? "Paid" : "Not paid"}</p>
+            <p className="flex items-center gap-3 text-[17px]">
+              {money(d.feeCents)}<Badge tone={d.feePaid ? "ok" : "warn"}>{d.feePaid ? "Paid" : "Not paid"}</Badge>
+            </p>
           )}
         </Row>
       </Box>

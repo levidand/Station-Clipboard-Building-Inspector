@@ -4,39 +4,41 @@ import { ArrowDown, ArrowUp, Plus, Save, Trash2, X } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { BASE, DISCIPLINE_LABELS, keys, useChecklists } from "@/lib/inspections";
 import type { Checklist, ChecklistItem, Discipline } from "@/lib/types";
-import { Badge, Button, Field, IconButton, Input, Modal, Select, Textarea, Toggle } from "@/components/ui";
-import { Box, Confirm, EmptyBox, Group, QueryState } from "@/components/kit";
+import { Button, Field, IconButton, Input, Modal, Select, Textarea, Toggle } from "@/components/ui";
+import { Box, Confirm, EmptyBox, Group, PageHead, QueryState } from "@/components/kit";
 import { toast } from "@/components/toast";
-import type { SectionProps } from "./SettingsPage";
+import { OpenRow, Off, grouped, plural } from "./parts";
 
 const newId = () => Math.random().toString(36).slice(2, 10);
+const DISCIPLINES = Object.keys(DISCIPLINE_LABELS) as Discipline[];
 
-export function ChecklistsSection(_: SectionProps) {
+/** The checklists, grouped by kind. Each one saves on its own, straight from its editor. */
+export function ChecklistsSection() {
   const lists = useChecklists();
   const [editing, setEditing] = useState<Checklist | "new" | null>(null);
   return (
-    <Group title={`${lists.data?.length ?? 0} checklists`} actions={<Button variant="primary" onClick={() => setEditing("new")}><Plus className="h-4 w-4" />New checklist</Button>}>
+    <>
+      <PageHead title="Checklists" sub="What an inspector works down. Changing one never changes an inspection already done.">
+        <Button variant="primary" size="lg" onClick={() => setEditing("new")}><Plus className="h-5 w-5" />New checklist</Button>
+      </PageHead>
       <QueryState query={lists}>
-        {(lists.data ?? []).length === 0 ? <EmptyBox title="No checklists" /> : (
-          <Box>
-            {lists.data!.map(c => (
-              <button key={c.id} type="button" onClick={() => setEditing(c)}
-                className="flex min-h-16 w-full items-center gap-3 border-b border-divider px-4 py-3 text-left last:border-b-0 hover:bg-hover">
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className={c.isActive ? "text-[17px] font-medium" : "text-[17px] font-medium text-ink-3"}>{c.name}</span>
-                    <Badge tone="muted">{DISCIPLINE_LABELS[c.discipline]}</Badge>
-                    {!c.isActive && <Badge tone="muted">Retired</Badge>}
-                  </span>
-                  <span className="block text-[15px] text-ink-3">{c.items.length} lines{c.description ? ` · ${c.description}` : ""}</span>
-                </span>
-              </button>
-            ))}
-          </Box>
-        )}
+        {(lists.data ?? []).length === 0 ? <EmptyBox title="No checklists yet">Start one with New checklist at the top.</EmptyBox>
+          : grouped(lists.data!, c => c.discipline, DISCIPLINES).map(g => (
+            <Group key={g.key} title={`${DISCIPLINE_LABELS[g.key]} (${g.rows.length})`}>
+              <Box>
+                {g.rows.map(c => (
+                  <OpenRow
+                    key={c.id} title={c.name} muted={!c.isActive} onOpen={() => setEditing(c)}
+                    tags={!c.isActive && <Off />}
+                    detail={[plural(c.items.length, "line"), c.description].filter(Boolean).join(" · ")}
+                  />
+                ))}
+              </Box>
+            </Group>
+          ))}
       </QueryState>
       {editing && <ChecklistEditor list={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
-    </Group>
+    </>
   );
 }
 

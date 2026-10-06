@@ -11,11 +11,9 @@ import { usePermissions } from "@/lib/auth";
 import { BASE, keys } from "@/lib/inspections";
 import type { SearchResults, Today } from "@/lib/types";
 import { AppHeader } from "@/shared/AppHeader";
-import { DEPARTMENT_PORTAL_WINDOW, departmentPortalHref } from "@/shared/departmentPortal";
+import { departmentPortalHref, portalTarget, signedInHref } from "@/shared/departmentPortal";
 import { Logo } from "@/shared/Logo";
 import { Count, IconButton, Input, cx } from "./ui";
-
-export const COMMAND_PORTAL_URL = (import.meta.env.VITE_COMMAND_PORTAL_URL as string | undefined) || "https://cmd.stationclipboard.com";
 
 interface NavDef {
   href: string;
@@ -136,10 +134,10 @@ function NavList({ items, location, counts, big }: {
 function PortalLinks() {
   return (
     <div className="mt-auto border-t border-divider py-2">
-      <a href={departmentPortalHref()} target={DEPARTMENT_PORTAL_WINDOW} className="flex h-12 items-center gap-4 px-5 text-[15px] text-ink-3 hover:bg-white/[.05] hover:text-white">
+      <a href={departmentPortalHref()} target={portalTarget("department-portal")} className="flex h-12 items-center gap-4 px-5 text-[15px] text-ink-3 hover:bg-white/[.05] hover:text-white">
         <ExternalLink className="h-5 w-5 shrink-0" />Department Portal
       </a>
-      <a href={COMMAND_PORTAL_URL} target="_blank" rel="noopener" className="flex h-12 items-center gap-4 px-5 text-[15px] text-ink-3 hover:bg-white/[.05] hover:text-white">
+      <a href={signedInHref("command-portal")} target={portalTarget("command-portal")} className="flex h-12 items-center gap-4 px-5 text-[15px] text-ink-3 hover:bg-white/[.05] hover:text-white">
         <Siren className="h-5 w-5 shrink-0" />Command Portal
       </a>
     </div>

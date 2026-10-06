@@ -1,8 +1,8 @@
 {
-  "src/shared/AppHeader.tsx": "f685f69831089e23",
-  "src/shared/HeaderActions.tsx": "e95ae18734e95858",
+  "src/shared/AppHeader.tsx": "2e0a17af5dd52823",
+  "src/shared/HeaderActions.tsx": "08284e3ac3418496",
   "src/shared/Logo.tsx": "fa8add74128cd235",
   "src/shared/README.md": "50e12963c8979652",
-  "src/shared/departmentPortal.ts": "36ee2cbb59b469f1",
+  "src/shared/departmentPortal.ts": "0bf8974b7a52a777",
   "tools/sync-shared.mjs": "6402589fd84e03e6"
 }

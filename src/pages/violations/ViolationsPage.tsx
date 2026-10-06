@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearch } from "wouter";
-import { CheckCircle2, Gavel, MoreHorizontal } from "lucide-react";
+import { Link, useLocation, useSearch } from "wouter";
+import { ArrowRight, Ban, CheckCircle2, Gavel, RotateCcw } from "lucide-react";
 import { api, errorMessage, get } from "@/lib/api";
 import { usePermissions } from "@/lib/auth";
 import { BASE, keys, useRefreshAll } from "@/lib/inspections";
 import type { Listed, Violation, ViolationStatus } from "@/lib/types";
-import { Button, Field, Menu, MenuItem, Textarea } from "@/components/ui";
-import { Box, Confirm, EmptyBox, FilterBar, Group, PAGE, PageHead, QueryState } from "@/components/kit";
+import { Field, Textarea } from "@/components/ui";
+import { ActionMenu, Box, Confirm, EmptyBox, FilterBar, Group, PAGE, PageHead, QueryState } from "@/components/kit";
 import { ViolationLine } from "@/components/records";
 import { toast } from "@/components/toast";
 
@@ -66,7 +66,7 @@ export function ViolationsPage() {
 
 function RowActions({ v, canAct }: { v: Violation; canAct: boolean }) {
   const refresh = useRefreshAll();
-  const [menu, setMenu] = useState(false);
+  const [, navigate] = useLocation();
   const [asking, setAsking] = useState<null | "corrected" | "cited" | "void" | "open">(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -91,19 +91,18 @@ function RowActions({ v, canAct }: { v: Violation; canAct: boolean }) {
   };
 
   return (
-    <div className="flex gap-2">
-      {source && <Link href={source} className="inline-flex h-10 items-center rounded-sm border border-faded px-3 text-[14px] font-medium uppercase tracking-[0.02em] hover:bg-white/[.075]">Open</Link>}
-      {canAct && v.status === "open" && <Button size="sm" variant="ok" onClick={() => setAsking("corrected")}><CheckCircle2 className="h-4 w-4" />Fixed</Button>}
-      {canAct && (
-        <div className="relative">
-          <Button size="sm" variant="ghost" onClick={() => setMenu(m => !m)} aria-label="More"><MoreHorizontal className="h-5 w-5" /></Button>
-          <Menu open={menu} onClose={() => setMenu(false)}>
-            {v.status === "open" && <MenuItem icon={Gavel} onClick={() => { setMenu(false); setAsking("cited"); }}>Mark cited</MenuItem>}
-            {v.status !== "void" && <MenuItem danger onClick={() => { setMenu(false); setAsking("void"); }}>Void (written in error)</MenuItem>}
-            {v.status !== "open" && <MenuItem onClick={() => { setMenu(false); setAsking("open"); }}>Reopen</MenuItem>}
-          </Menu>
-        </div>
-      )}
+    <div>
+      <ActionMenu size="sm" variant="secondary" sections={[
+        { items: [
+          canAct && v.status === "open" && { label: "It's fixed", icon: CheckCircle2, tone: "ok", hint: "You've seen it corrected.", onClick: () => setAsking("corrected") },
+          !!source && { label: v.inspectionId ? "Open the inspection" : "Open the complaint", icon: ArrowRight, onClick: () => navigate(source) },
+        ] },
+        { items: canAct ? [
+          v.status === "open" && { label: "Mark cited", icon: Gavel, hint: "A citation was written, or it went to court.", onClick: () => setAsking("cited") },
+          v.status !== "open" && { label: "Reopen", icon: RotateCcw, onClick: () => setAsking("open") },
+          v.status !== "void" && { label: "Void it", icon: Ban, danger: true, hint: "Written in error.", onClick: () => setAsking("void") },
+        ] : [] },
+      ]} />
       {asking && (
         <Confirm open title={labels[asking].title} confirmLabel={labels[asking].button} danger={asking === "void"} busy={busy}
           body={labels[asking].body} onClose={() => setAsking(null)} onConfirm={() => set(asking)}>

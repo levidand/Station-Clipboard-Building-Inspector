@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Ban, CheckCircle2, ClipboardPlus, MoreHorizontal, Pencil, Plus, Save, Stamp, ThumbsUp, Trash2, UserPlus, X } from "lucide-react";
+import { Ban, CheckCircle2, ClipboardPlus, Pencil, Plus, RotateCcw, Save, Stamp, ThumbsUp, Trash2, UserPlus, X } from "lucide-react";
 import { api, errorMessage, get } from "@/lib/api";
 import { useAuth, usePermissions } from "@/lib/auth";
 import { BASE, EVENT_FEATURES, EVENT_KIND, EVENT_STATUS, PERMIT_STATUS, keys, typeLabel, useRefreshAll, useSettings } from "@/lib/inspections";
 import type { EventDetail, EventStatus, EventTask } from "@/lib/types";
-import { Badge, Button, CheckGlyphButton, Field, IconButton, Input, Menu, MenuItem, Textarea, cx } from "@/components/ui";
-import { Box, Confirm, Fact, Facts, Group, ListRow, Note, PAGE, PageHead, QueryState } from "@/components/kit";
+import { Badge, Button, CheckGlyphButton, Field, IconButton, Input, Textarea, cx } from "@/components/ui";
+import { ActionMenu, Box, Confirm, Fact, Facts, Group, ListRow, Note, PAGE, PageHead, QueryState } from "@/components/kit";
 import { FilesPanel, HistoryPanel, InspectionListRow, PersonSelect, ScheduleDialog } from "@/components/records";
 import { toast } from "@/components/toast";
 import { NewPermitDialog } from "../permits/PermitDialogs";
@@ -23,7 +23,6 @@ export function EventPage({ id }: { id: number }) {
   const [, navigate] = useLocation();
   const q = useQuery({ queryKey: keys.event(id), queryFn: ({ signal }) => get<EventDetail>(`${BASE}/events/${id}`, signal) });
   const [dialog, setDialog] = useState<null | "edit" | "walk" | "permit" | "delete" | "cancel">(null);
-  const [menu, setMenu] = useState(false);
   const [newTask, setNewTask] = useState("");
   const [adding, setAdding] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -62,21 +61,22 @@ export function EventPage({ id }: { id: number }) {
         sub={`${EVENT_KIND[d.kind]} · ${eventWhen(d)}${d.locationName || d.address ? ` · ${d.locationName ?? d.address}` : ""}`}
         badges={<Badge tone={EVENT_STATUS[d.status].tone}>{EVENT_STATUS[d.status].label}</Badge>}
       >
-        {can && d.status === "planning" && <Button variant="ok" size="lg" onClick={() => setStatus("approved", "Approved")}><ThumbsUp className="h-5 w-5" />Approve</Button>}
-        {can && (d.status === "approved" || d.status === "planning") && ended && <Button variant="primary" size="lg" onClick={() => setStatus("completed", "Marked done")}><CheckCircle2 className="h-5 w-5" />Mark done</Button>}
-        {perms.inspect && planning && <Button size="lg" onClick={() => setDialog("walk")}><ClipboardPlus className="h-5 w-5" />Schedule a walk-through</Button>}
-        {perms.permits && d.permits.length === 0 && planning && <Button size="lg" onClick={() => setDialog("permit")}><Stamp className="h-5 w-5" />Event permit</Button>}
-        {can && (
-          <div className="relative">
-            <Button size="lg" variant="ghost" onClick={() => setMenu(m => !m)} aria-label="More"><MoreHorizontal className="h-6 w-6" /></Button>
-            <Menu open={menu} onClose={() => setMenu(false)}>
-              <MenuItem icon={Pencil} onClick={() => { setMenu(false); setDialog("edit"); }}>Change the details</MenuItem>
-              {d.status !== "planning" && <MenuItem onClick={() => { setMenu(false); void setStatus("planning", "Back to planning"); }}>Back to planning</MenuItem>}
-              {d.status !== "cancelled" && <MenuItem icon={Ban} danger onClick={() => { setMenu(false); setDialog("cancel"); }}>Cancel the event</MenuItem>}
-              {perms.settings && <MenuItem icon={Trash2} danger onClick={() => { setMenu(false); setDialog("delete"); }}>Delete</MenuItem>}
-            </Menu>
-          </div>
-        )}
+        <ActionMenu sections={[
+          { title: "Next step", items: [
+            can && d.status === "planning" && { label: "Approve", icon: ThumbsUp, tone: "ok", hint: "The plan is good to go.", onClick: () => void setStatus("approved", "Approved") },
+            can && (d.status === "approved" || d.status === "planning") && ended && {
+              label: "Mark done", icon: CheckCircle2, tone: "ok", hint: "Then write the after-event report below.", onClick: () => void setStatus("completed", "Marked done"),
+            },
+            perms.inspect && planning && { label: "Schedule a walk-through", icon: ClipboardPlus, tone: "brand", hint: "An inspection of the site before it opens.", onClick: () => setDialog("walk") },
+            perms.permits && d.permits.length === 0 && planning && { label: "Start the event permit", icon: Stamp, tone: "info", onClick: () => setDialog("permit") },
+          ] },
+          { items: [
+            can && { label: "Change the details", icon: Pencil, onClick: () => setDialog("edit") },
+            can && d.status !== "planning" && { label: "Back to planning", icon: RotateCcw, onClick: () => void setStatus("planning", "Back to planning") },
+            can && d.status !== "cancelled" && { label: "Cancel the event", icon: Ban, danger: true, onClick: () => setDialog("cancel") },
+            can && perms.settings && { label: "Delete the event", icon: Trash2, danger: true, onClick: () => setDialog("delete") },
+          ] },
+        ]} />
       </PageHead>
 
       <Group title={`Planning list (${tasksDone} of ${d.tasks.length} done)`}>

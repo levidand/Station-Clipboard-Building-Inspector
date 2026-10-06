@@ -28,8 +28,7 @@ function Fields({ f, set, isNew }: { f: PermitForm; set: (p: Partial<PermitForm>
           const next = types.find(t => t.key === e.target.value);
           set({ typeKey: e.target.value, ...(isNew && next?.feeCents != null ? { feeCents: next.feeCents } : {}) });
         }}>
-          <option value="">Pick one…</option>
-          {(Object.keys(PERMIT_CATEGORY) as PermitCategory[]).map(c => (
+          {(Object.keys(PERMIT_CATEGORY) as PermitCategory[]).map(c => types.some(t => t.category === c) && (
             <optgroup key={c} label={`${PERMIT_CATEGORY[c]} permits`}>
               {types.filter(t => t.category === c).map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
             </optgroup>

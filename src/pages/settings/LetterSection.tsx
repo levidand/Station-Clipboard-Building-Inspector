@@ -1,22 +1,21 @@
 import { Field, Input, Textarea } from "@/components/ui";
-import { Box, Group, Row } from "@/components/kit";
-import { SaveBar, useSettingsDraft, type SectionProps } from "./SettingsPage";
+import { Box, Group, PageHead, Row } from "@/components/kit";
+import type { SectionProps } from "./parts";
 
-export function LetterSection({ settings }: SectionProps) {
-  const d = useSettingsDraft(settings, ["letter"]);
-  const l = d.draft.letter;
-  const set = (patch: Partial<typeof l>) => d.set("letter", { ...l, ...patch });
+export function LetterSection({ form, set }: SectionProps) {
+  const l = form.letter;
+  const put = (patch: Partial<typeof l>) => set("letter", { ...l, ...patch });
   return (
-    <div className="space-y-5">
+    <>
+      <PageHead title="Notice wording" sub="The words printed around the list of violations on a Notice of Violation." />
       <Group title="The notice" hint="The list of violations, the dates to correct them and the re-inspection date are filled in between the opening and the closing.">
         <Box>
-          <Row><Field label="Heading"><Input value={l.heading} onChange={e => set({ heading: e.target.value })} /></Field></Row>
-          <Row><Field label="Opening paragraph"><Textarea value={l.intro} onChange={e => set({ intro: e.target.value })} className="min-h-[120px]" /></Field></Row>
-          <Row><Field label="Closing paragraph"><Textarea value={l.closing} onChange={e => set({ closing: e.target.value })} className="min-h-[120px]" /></Field></Row>
-          <Row><Field label="Signed as" hint="The title under the signature line."><Input value={l.signatureTitle} onChange={e => set({ signatureTitle: e.target.value })} /></Field></Row>
+          <Row><Field label="Heading"><Input value={l.heading} maxLength={120} onChange={e => put({ heading: e.target.value })} className="max-w-xl" /></Field></Row>
+          <Row><Field label="Opening paragraph"><Textarea value={l.intro} maxLength={3000} onChange={e => put({ intro: e.target.value })} className="min-h-[120px]" /></Field></Row>
+          <Row><Field label="Closing paragraph"><Textarea value={l.closing} maxLength={3000} onChange={e => put({ closing: e.target.value })} className="min-h-[120px]" /></Field></Row>
+          <Row><Field label="Signed as" hint="The title under the signature line."><Input value={l.signatureTitle} maxLength={120} onChange={e => put({ signatureTitle: e.target.value })} className="max-w-xl" /></Field></Row>
         </Box>
       </Group>
-      <SaveBar dirty={d.dirty} saving={d.saving} onSave={() => void d.save()} onReset={d.reset} />
-    </div>
+    </>
   );
 }

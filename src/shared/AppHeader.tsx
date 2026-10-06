@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { initials } from "@/lib/format";
 import { Menu, MenuItem, MenuLink, MenuSeparator, cx } from "@/components/ui";
 import { PORTAL } from "@/portal";
-import { DEPARTMENT_PORTAL_WINDOW, departmentPortalHref } from "./departmentPortal";
+import { departmentPortalHref, portalTarget } from "./departmentPortal";
 import { HeaderActions } from "./HeaderActions";
 import { Logo } from "./Logo";
 
@@ -74,10 +74,10 @@ export function UserMenu() {
             <MenuSeparator />
           </>
         )}
-        <MenuLink icon={ExternalLink} href={departmentPortalHref()} target={DEPARTMENT_PORTAL_WINDOW} onClick={close}>
+        <MenuLink icon={ExternalLink} href={departmentPortalHref()} target={portalTarget("department-portal")} onClick={close}>
           Department Portal
         </MenuLink>
-        <MenuLink icon={UserRound} href={departmentPortalHref("/profile")} target={DEPARTMENT_PORTAL_WINDOW} onClick={close}>
+        <MenuLink icon={UserRound} href={departmentPortalHref("/profile")} target={portalTarget("department-portal")} onClick={close}>
           Your profile
         </MenuLink>
         <MenuSeparator />

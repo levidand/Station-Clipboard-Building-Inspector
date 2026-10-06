@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { BadgeCheck, ClipboardCheck, ClipboardPlus, FileCheck2, MoreHorizontal, Pencil, Printer, Trash2 } from "lucide-react";
+import {
+  BadgeCheck, Ban, CalendarX2, ClipboardCheck, ClipboardPlus, FileCheck2, FileSearch, Pencil, Printer, RotateCcw, Trash2, XCircle,
+} from "lucide-react";
 import { api, errorMessage, get } from "@/lib/api";
 import { usePermissions } from "@/lib/auth";
 import { dateTime, daysBetween, formatDay, money } from "@/lib/format";
 import { BASE, PERMIT_CATEGORY, PERMIT_STATUS, keys, typeLabel, useRefreshAll, useSettings } from "@/lib/inspections";
 import type { PermitDetail, PermitReview, PermitStatus } from "@/lib/types";
-import { Badge, Button, Field, Menu, MenuItem, Textarea, TONE_EDGE, cx } from "@/components/ui";
-import { Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
+import { Badge, Button, Field, Textarea, TONE_EDGE, cx } from "@/components/ui";
+import { ActionMenu, Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
 import { FilesPanel, HistoryPanel, InspectionListRow, ScheduleDialog } from "@/components/records";
 import { toast } from "@/components/toast";
 import { EditPermitDialog, ReviewDialog } from "./PermitDialogs";
@@ -28,7 +30,6 @@ export function PermitPage({ id }: { id: number }) {
   const [reviewing, setReviewing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [scheduling, setScheduling] = useState(false);
-  const [menu, setMenu] = useState(false);
   const [asking, setAsking] = useState<PermitStatus | "delete" | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -74,29 +75,30 @@ export function PermitPage({ id }: { id: number }) {
           <Badge tone="muted">{PERMIT_CATEGORY[d.category]}</Badge>
         </>}
       >
-        {perms.permits && waiting && <Button variant="primary" size="lg" onClick={() => setReviewing(true)}><FileCheck2 className="h-5 w-5" />Record a plan review</Button>}
-        {perms.permits && (d.status === "approved" || d.status === "in_review" || d.status === "applied") && (
-          <Button variant="ok" size="lg" onClick={() => setAsking("issued")}><BadgeCheck className="h-5 w-5" />Issue the permit</Button>
-        )}
-        {d.status === "issued" && <>
-          <Button variant="primary" size="lg" onClick={() => navigate(`/permits/${id}/print`)}><Printer className="h-5 w-5" />Print the permit</Button>
-          {perms.inspect && <Button size="lg" onClick={() => setScheduling(true)}><ClipboardPlus className="h-5 w-5" />Schedule an inspection</Button>}
-          {perms.permits && <Button variant="ok" size="lg" onClick={() => setAsking("finaled")}><ClipboardCheck className="h-5 w-5" />Final approval</Button>}
-        </>}
-        {perms.permits && (
-          <div className="relative">
-            <Button size="lg" variant="ghost" onClick={() => setMenu(m => !m)} aria-label="More"><MoreHorizontal className="h-6 w-6" /></Button>
-            <Menu open={menu} onClose={() => setMenu(false)}>
-              <MenuItem icon={Pencil} onClick={() => { setMenu(false); setEditing(true); }}>Change the details</MenuItem>
-              {d.status === "applied" && <MenuItem onClick={() => { setMenu(false); setAsking("in_review"); }}>Start plan review</MenuItem>}
-              {(d.status === "issued" || d.status === "finaled") && <MenuItem onClick={() => { setMenu(false); setAsking("applied"); }}>Put back to applied</MenuItem>}
-              {d.status === "issued" && <MenuItem onClick={() => { setMenu(false); setAsking("expired"); }}>Mark expired</MenuItem>}
-              {!closed && <MenuItem danger onClick={() => { setMenu(false); setAsking("denied"); }}>Deny</MenuItem>}
-              {d.status !== "void" && <MenuItem danger onClick={() => { setMenu(false); setAsking("void"); }}>Void</MenuItem>}
-              {perms.settings && <MenuItem icon={Trash2} danger onClick={() => { setMenu(false); setAsking("delete"); }}>Delete</MenuItem>}
-            </Menu>
-          </div>
-        )}
+        <ActionMenu sections={[
+          { title: "Next step", items: [
+            perms.permits && waiting && { label: "Record a plan review", icon: FileCheck2, tone: "brand", hint: "Approved, corrections needed, or denied, with comments.", onClick: () => setReviewing(true) },
+            perms.permits && (d.status === "approved" || d.status === "in_review" || d.status === "applied") && {
+              label: "Issue the permit", icon: BadgeCheck, tone: "ok", hint: "It becomes live today.", onClick: () => setAsking("issued"),
+            },
+            perms.permits && d.status === "issued" && { label: "Final approval", icon: ClipboardCheck, tone: "ok", hint: "The work passed its final inspection.", onClick: () => setAsking("finaled") },
+            perms.inspect && d.status === "issued" && { label: "Schedule an inspection", icon: ClipboardPlus, tone: "brand", onClick: () => setScheduling(true) },
+          ] },
+          { title: "Print", items: [
+            d.status === "issued" && { label: "Print the permit", icon: Printer, hint: "To post on the job or at the event.", onClick: () => navigate(`/permits/${id}/print`) },
+          ] },
+          { title: "Status", items: perms.permits ? [
+            d.status === "applied" && { label: "Start plan review", icon: FileSearch, onClick: () => setAsking("in_review") },
+            (d.status === "issued" || d.status === "finaled") && { label: "Put back to applied", icon: RotateCcw, hint: "Undoes the issue or the final approval.", onClick: () => setAsking("applied") },
+            d.status === "issued" && { label: "Mark expired", icon: CalendarX2, onClick: () => setAsking("expired") },
+            !closed && { label: "Deny", icon: XCircle, danger: true, onClick: () => setAsking("denied") },
+            d.status !== "void" && { label: "Void", icon: Ban, danger: true, hint: "Taken in error or withdrawn.", onClick: () => setAsking("void") },
+          ] : [] },
+          { items: [
+            perms.permits && { label: "Change the details", icon: Pencil, onClick: () => setEditing(true) },
+            perms.permits && perms.settings && { label: "Delete the permit", icon: Trash2, danger: true, onClick: () => setAsking("delete") },
+          ] },
+        ]} />
       </PageHead>
 
       {age != null && d.category === "building" && (
@@ -115,7 +117,7 @@ export function PermitPage({ id }: { id: number }) {
             <Fact label="Issued">{d.issuedOn ? formatDay(d.issuedOn) : null}</Fact>
             <Fact label="Expires">{d.expiresOn ? formatDay(d.expiresOn) : null}</Fact>
             {d.finaledOn && <Fact label="Final approval">{formatDay(d.finaledOn)}</Fact>}
-            <Fact label="Fee">{d.feeCents != null ? `${money(d.feeCents)} · ${d.feePaid ? "paid" : "not paid"}` : null}</Fact>
+            <Fact label="Fee">{d.feeCents != null ? <FeeLine d={d} canEdit={perms.permits} onSaved={saved} /> : null}</Fact>
             {d.valuationCents != null && <Fact label="Value of the work">{money(d.valuationCents)}</Fact>}
             <Fact label="Plan reviewer">{d.reviewerName}</Fact>
             {d.event && <Fact label="Event"><Link href={`/events/${d.event.id}`} className="text-sky hover:underline">{d.event.title}</Link></Fact>}
@@ -177,5 +179,26 @@ export function PermitPage({ id }: { id: number }) {
           catch (err) { toast.error(errorMessage(err)); } finally { setBusy(false); }
         }} />
     </div>
+  );
+}
+
+/** The fee and whether it's paid, with the one-press change beside it. */
+function FeeLine({ d, canEdit, onSaved }: { d: PermitDetail; canEdit: boolean; onSaved: (d: PermitDetail) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function mark(feePaid: boolean) {
+    setBusy(true);
+    try {
+      onSaved(await api<PermitDetail>("PATCH", `${BASE}/permits/${d.id}`, { feePaid }));
+      toast.success(feePaid ? "Fee marked paid" : "Fee marked not paid");
+    } catch (err) { toast.error(errorMessage(err)); } finally { setBusy(false); }
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      {money(d.feeCents)}
+      <Badge tone={d.feePaid ? "ok" : "warn"}>{d.feePaid ? "Paid" : "Not paid"}</Badge>
+      {canEdit && (d.feePaid
+        ? <Button size="sm" variant="ghost" loading={busy} onClick={() => void mark(false)}>Undo paid</Button>
+        : <Button size="sm" variant="ok" loading={busy} onClick={() => void mark(true)}><BadgeCheck className="h-4 w-4" />Mark paid</Button>)}
+    </span>
   );
 }

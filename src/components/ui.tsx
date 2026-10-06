@@ -1,11 +1,12 @@
 import {
-  forwardRef, useEffect, useId, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ComponentType,
-  type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes,
+  Children, Fragment, forwardRef, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState,
+  type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ComponentType, type CSSProperties, type InputHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type TextareaHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
 import clsx, { type ClassValue } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, X } from "lucide-react";
 
 /*
  * The portal's component set: the Command Portal's Material dark components
@@ -133,18 +134,238 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   return <textarea ref={ref} className={cx(control, "min-h-[104px] py-2.5 leading-snug", className)} {...rest} />;
 });
 
-/* Material arrow_drop_down in the highlight colour */
-const ARROW = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23ffffffb3' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\")";
+/**
+ * Where a floating panel goes, in screen coordinates: under its button if it
+ * fits, over it if that fits, otherwise slid up the screen until it does. It
+ * only scrolls when it's taller than the screen itself.
+ */
+export function floatPlace(r: DOMRect, w: number, h: number, align: "start" | "end" = "start"): { top: number; left: number; maxHeight?: number } {
+  const gap = 4, edge = 8, vw = window.innerWidth, vh = window.innerHeight;
+  const left = Math.max(edge, Math.min(align === "end" ? r.right - w : r.left, vw - w - edge));
+  if (h <= vh - r.bottom - gap - edge) return { top: r.bottom + gap, left };
+  if (h <= r.top - gap - edge) return { top: r.top - gap - h, left };
+  if (h <= vh - 2 * edge) return { top: vh - edge - h, left };
+  return { top: edge, left, maxHeight: vh - 2 * edge };
+}
 
-export function Select({ className, children, style, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
+interface SelectOption { value: string; label: string; disabled: boolean; group: string | null }
+
+const textOf = (n: ReactNode): string =>
+  typeof n === "string" || typeof n === "number" ? String(n)
+    : Array.isArray(n) ? n.map(textOf).join("")
+      : isValidElement<{ children?: ReactNode }>(n) ? textOf(n.props.children) : "";
+
+/** The <option>s and <optgroup>s written inside a Select, flattened. */
+function readOptions(children: ReactNode, group: string | null = null, out: SelectOption[] = []): SelectOption[] {
+  Children.forEach(children, child => {
+    if (!isValidElement<{ value?: unknown; label?: string; disabled?: boolean; children?: ReactNode }>(child)) return;
+    const p = child.props;
+    if (child.type === "option") out.push({ value: String(p.value ?? textOf(p.children)), label: textOf(p.children), disabled: !!p.disabled, group });
+    else if (child.type === "optgroup") readOptions(p.children, p.label ?? null, out);
+    else if (child.type === Fragment) readOptions(p.children, group, out);
+  });
+  return out;
+}
+
+export interface SelectProps {
+  value: string | number | null | undefined;
+  /** Shaped like a native select's change event, so `e.target.value` works as it always did. */
+  onChange?: (e: { target: { value: string } }) => void;
+  /** <option> and <optgroup> elements, as in a native select. */
+  children?: ReactNode;
+  /** Shown, dimmed, while nothing in the list is chosen. */
+  placeholder?: string;
+  className?: string;
+  id?: string;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  "aria-label"?: string;
+}
+
+/**
+ * A drop-down in the portal's own look. The browser's native list ignores the
+ * theme (small type, the system's colours, its own scroll box), so this draws
+ * the list itself: 48px rows in 17px type, the chosen one filled blue with a
+ * tick, groups under small-caps titles. It opens under the box, or over it near
+ * the bottom of the screen, and is never cut off by a dialog. On a phone it's a
+ * sheet from the bottom. Arrow keys, Home/End, Enter, Escape and typing the
+ * first letters all work.
+ */
+export function Select({ value, onChange, children, placeholder = "Pick one…", className, id, disabled, autoFocus, "aria-label": ariaLabel }: SelectProps) {
+  const options = readOptions(children);
+  const current = String(value ?? "");
+  const chosen = options.find(o => o.value === current);
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const listId = useId();
+
+  function close() { setOpen(false); button.current?.focus({ preventScroll: true }); }
+  function pick(v: string) {
+    close();
+    if (v !== current) onChange?.({ target: { value: v } });
+  }
+
   return (
-    <select
-      className={cx(control, "h-12 cursor-pointer appearance-none bg-[length:28px] bg-[right_4px_center] bg-no-repeat pr-10 [&>option]:bg-surface [&>option]:font-normal", className)}
-      style={{ backgroundImage: ARROW, ...style }}
-      {...rest}
-    >
-      {children}
-    </select>
+    <>
+      <button
+        ref={button} type="button" id={id} disabled={disabled} autoFocus={autoFocus} aria-label={ariaLabel}
+        aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined}
+        onClick={() => setOpen(o => !o)}
+        onKeyDown={e => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setOpen(true); } }}
+        className={cx(control, "flex h-12 cursor-pointer items-center gap-2 pr-2 text-left", open && "border-yellow shadow-[inset_0_-2px_0_var(--color-yellow)]", className)}
+      >
+        {/* Every option sits invisibly in the same grid cell, so a box that
+            isn't full width is as wide as its longest choice, like a native one. */}
+        <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] overflow-hidden">
+          <span className={cx("truncate [grid-area:1/1]", !chosen && "font-normal text-ink-4")}>{chosen?.label ?? placeholder}</span>
+          {options.map(o => <span key={o.value} aria-hidden className="invisible h-0 overflow-hidden whitespace-nowrap [grid-area:1/1]">{o.label}</span>)}
+        </span>
+        <ChevronDown className={cx("h-5 w-5 shrink-0 text-ink-3 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && button.current && (
+        <SelectList id={listId} anchor={button.current} options={options} current={current} onPick={pick} onClose={close} />
+      )}
+    </>
+  );
+}
+
+function SelectList({ id, anchor, options, current, onPick, onClose }: {
+  id: string; anchor: HTMLElement; options: SelectOption[]; current: string; onPick: (v: string) => void; onClose: () => void;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  const [phone] = useState(() => window.innerWidth < 640);
+  // A long list (forty inspection types) runs down two or three columns
+  // instead of off the bottom of the screen.
+  const [cols] = useState(() => (phone ? 1 : Math.max(1, Math.min(3, Math.ceil(options.length / 12), Math.floor((window.innerWidth - 16) / 240)))));
+  const [colWidth] = useState(() => Math.min(window.innerWidth - 16, Math.max(anchor.offsetWidth, cols * 256)));
+  const [place, setPlace] = useState<CSSProperties | null>(null);
+  const [active, setActive] = useState(() => {
+    const at = options.findIndex(o => o.value === current);
+    return at >= 0 ? at : options.findIndex(o => !o.disabled);
+  });
+  const typed = useRef({ text: "", at: 0 });
+  /** Outline the highlighted row only once the keys are in use; for a finger or a mouse the fill says enough. */
+  const [keyed, setKeyed] = useState(false);
+  // The sheet's title: the words of the Field this sits in.
+  const [title] = useState(() => anchor.closest("label")?.firstElementChild?.firstChild?.textContent?.trim() || anchor.getAttribute("aria-label") || "Choose one");
+
+  useLayoutEffect(() => {
+    const el = panel.current;
+    if (!el) return;
+    if (!phone) setPlace(floatPlace(anchor.getBoundingClientRect(), el.offsetWidth, el.offsetHeight));
+  }, [anchor, phone]);
+
+  // Focus once it's placed: while it's being measured it's hidden, and a hidden element can't take focus.
+  const shown = phone || place != null;
+  useEffect(() => {
+    if (shown) panel.current?.focus({ preventScroll: true });
+  }, [shown]);
+
+  // Keep the highlighted choice in view, moving only the list (scrollIntoView
+  // would move the page under it too).
+  useEffect(() => {
+    const box = panel.current;
+    const row = box?.querySelector<HTMLElement>(`[data-i="${active}"]`);
+    if (!box || !row) return;
+    const top = row.offsetTop, bottom = top + row.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
+  }, [active, place]);
+
+  // Under a button, the list would be left behind if the page moved: close it instead.
+  useEffect(() => {
+    if (phone) return;
+    const onScroll = (e: Event) => { if (!panel.current?.contains(e.target as Node)) onClose(); };
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onClose);
+    return () => { window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", onClose); };
+  }, [phone, onClose]);
+
+  function step(from: number, by: number) {
+    for (let i = 1; i <= options.length; i++) {
+      const j = (from + by * i + options.length * i) % options.length;
+      if (!options[j].disabled) return j;
+    }
+    return from;
+  }
+
+  function keys(e: ReactKeyboardEvent) {
+    setKeyed(true);
+    const enabled = options.map((o, i) => (o.disabled ? -1 : i)).filter(i => i >= 0);
+    if (e.key === "ArrowDown") setActive(a => step(a, 1));
+    else if (e.key === "ArrowUp") setActive(a => step(a, -1));
+    else if (e.key === "Home") setActive(enabled[0] ?? 0);
+    else if (e.key === "End") setActive(enabled[enabled.length - 1] ?? 0);
+    else if (e.key === "Enter" || e.key === " ") { if (options[active] && !options[active].disabled) onPick(options[active].value); }
+    else if (e.key === "Escape" || e.key === "Tab") onClose();
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Typing jumps to the first choice that starts with what was typed.
+      const now = Date.now();
+      typed.current = { text: (now - typed.current.at < 700 ? typed.current.text : "") + e.key.toLowerCase(), at: now };
+      const hit = enabled.find(i => options[i].label.toLowerCase().startsWith(typed.current.text));
+      if (hit !== undefined) setActive(hit);
+    } else return;
+    e.preventDefault();
+    // Keeps Escape from also closing the dialog or panel this list sits in.
+    e.stopPropagation();
+  }
+
+  let lastGroup: string | null = null;
+  const rows = options.map((o, i) => {
+    const header = o.group !== lastGroup && o.group != null;
+    const divide = i > 0 && o.group !== lastGroup;
+    lastGroup = o.group;
+    const on = o.value === current;
+    return (
+      <div key={`${o.group}:${o.value}`} className={cx("break-inside-avoid", divide && "mt-1.5 border-t border-divider pt-1.5")}>
+        {header && <div role="presentation" className="px-4 pb-1 pt-1.5 text-[13px] font-medium uppercase tracking-[0.06em] text-ink-3">{o.group}</div>}
+        <div
+          id={`${id}-${i}`} data-i={i} role="option" aria-selected={on} aria-disabled={o.disabled || undefined}
+          onMouseMove={() => { if (!o.disabled && active !== i) setActive(i); }}
+          onClick={() => { if (!o.disabled) onPick(o.value); }}
+          className={cx(
+            "flex cursor-pointer items-center gap-3 px-4 py-2.5 text-[17px] leading-6",
+            phone ? "min-h-14" : "min-h-12",
+            on ? "bg-blue text-white" : i === active ? "bg-hover text-ink" : "text-ink",
+            on && keyed && i === active && "shadow-[inset_0_0_0_2px_rgb(255_255_255/0.55)]",
+            o.disabled && "cursor-default opacity-45",
+          )}
+        >
+          <Check className={cx("h-5 w-5 shrink-0", on ? "text-white" : "invisible")} strokeWidth={3} />
+          <span className="min-w-0 flex-1">{o.label}</span>
+        </div>
+      </div>
+    );
+  });
+
+  return createPortal(
+    <>
+      <div className={cx("fixed inset-0 z-[60]", phone && "bg-mask/70")} onClick={onClose} />
+      <div
+        ref={panel} id={id} role="listbox" tabIndex={-1} aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
+        onKeyDown={keys}
+        style={phone ? undefined : {
+          position: "fixed", minWidth: anchor.offsetWidth,
+          ...(cols > 1 ? { columnCount: cols, columnGap: 0, width: colWidth } : {}),
+          ...(place ?? { top: 0, left: 0, visibility: "hidden" }),
+        }}
+        className={cx(
+          "z-[61] overflow-y-auto bg-surface text-ink shadow-float outline-none",
+          phone
+            ? "fixed inset-x-0 bottom-0 max-h-[85dvh] pb-3"
+            : cx("rounded-sm border border-divider py-1.5", cols > 1 ? "[column-rule:1px_solid_var(--color-divider)]" : "w-max max-w-[min(32rem,calc(100vw-16px))]"),
+        )}
+      >
+        {phone && (
+          <div className="flex items-center justify-between py-1 pl-5 pr-2">
+            <h2 className="text-[20px] font-medium">{title.replace(/\s*\(required\)$/, "")}</h2>
+            <IconButton label="Close" onClick={onClose}><X className="h-6 w-6" /></IconButton>
+          </div>
+        )}
+        {options.length === 0 ? <p className="px-4 py-3 text-[16px] text-ink-3">Nothing to choose from.</p> : rows}
+      </div>
+    </>,
+    document.body,
   );
 }
 
@@ -524,6 +745,8 @@ export function MoneyInput({ cents, onChange, className }: { cents: number | nul
           const parsed = parseMoney(e.target.value);
           if (parsed !== undefined) onChange(parsed);
         }}
+        // "75" becomes "75.00" on the way out; something that isn't money goes back to the last amount.
+        onBlur={() => { const parsed = parseMoney(text); setText(moneyText(parsed === undefined ? cents : parsed)); }}
         className={cx("w-36 tabular-nums", className)}
       />
     </span>

@@ -1,83 +1,105 @@
-import { useMemo, useState } from "react";
-import { Plus, Save } from "lucide-react";
+import { useState } from "react";
+import { Plus } from "lucide-react";
 import { SEVERITY } from "@/lib/inspections";
 import type { Severity, ViolationCode } from "@/lib/types";
-import { Badge, Button, Field, Input, Modal, Segmented, Textarea, Toggle } from "@/components/ui";
-import { Box, EmptyBox, Group, SearchBox } from "@/components/kit";
-import { SaveBar, useSettingsDraft, type SectionProps } from "./SettingsPage";
+import { Badge, Button, Field, Input, Segmented, Textarea, Toggle } from "@/components/ui";
+import { Box, EmptyBox, FilterBar, Group, PageHead } from "@/components/kit";
+import {
+  EditDialog, NumberField, OpenRow, Off, matches, plural, rangeError, rowState, showingFilter, shows,
+  type SectionProps, type Showing,
+} from "./parts";
 
-export function CodesSection({ settings }: SectionProps) {
-  const d = useSettingsDraft(settings, ["violationCodes"]);
+const SEVERITIES = Object.keys(SEVERITY) as Severity[];
+const dueText = (days: number) => (days === 0 ? "Same day" : plural(days, "day"));
+
+export function CodesSection({ form, saved, set }: SectionProps) {
   const [q, setQ] = useState("");
+  const [severity, setSeverity] = useState<Severity | "all">("all");
+  const [showing, setShowing] = useState<Showing>("all");
   const [editing, setEditing] = useState<ViolationCode | "new" | null>(null);
-  const codes = d.draft.violationCodes;
-  const shown = useMemo(() => {
-    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    return codes.filter(c => words.every(w => `${c.code} ${c.title} ${c.description}`.toLowerCase().includes(w)));
-  }, [codes, q]);
+  const codes = form.violationCodes;
+  const shown = codes.filter(c =>
+    (severity === "all" || c.severity === severity) && shows(showing, c.active) && matches(q, c.code, c.title, c.description));
+  const savedById = new Map(saved.violationCodes.map(c => [c.id, c]));
 
-  const put = (c: ViolationCode) => d.set("violationCodes", codes.some(x => x.id === c.id) ? codes.map(x => (x.id === c.id ? c : x)) : [...codes, c]);
+  const put = (c: ViolationCode) => set("violationCodes", codes.some(x => x.id === c.id) ? codes.map(x => (x.id === c.id ? c : x)) : [...codes, c]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchBox value={q} onChange={setQ} placeholder="Find a code: a word or a section" />
-        <Button variant="primary" onClick={() => setEditing("new")}><Plus className="h-4 w-4" />Add a code</Button>
-        <span className="text-[15px] text-ink-3">{codes.filter(c => c.active).length} in use, written for the {settings.codeEdition} fire code</span>
-      </div>
-      <Group title={`${shown.length} code${shown.length === 1 ? "" : "s"}`}>
-        {shown.length === 0 ? <EmptyBox title="Nothing matches" /> : (
+    <>
+      <PageHead title="Violation codes" sub="The library violations are picked from: the code section, what to fix, and how long to allow.">
+        <Button variant="primary" size="lg" onClick={() => setEditing("new")}><Plus className="h-5 w-5" />Add a code</Button>
+      </PageHead>
+
+      <FilterBar
+        search={{ value: q, onChange: setQ, placeholder: "Find a code: a word or a section" }}
+        filters={[
+          { label: "How serious", value: severity, empty: "all", onChange: setSeverity,
+            options: [{ value: "all", label: "Any" }, ...SEVERITIES.map(s => ({ value: s, label: SEVERITY[s].label }))] },
+          showingFilter(showing, setShowing),
+        ]}
+      />
+
+      <Group
+        title={`${shown.length === codes.length ? "All codes" : "Matching"} (${shown.length})`}
+        hint={`${codes.filter(c => c.active).length} in use, written for the ${form.codeEdition} fire code. A code that's switched off stays on violations already written with it.`}
+      >
+        {shown.length === 0 ? <EmptyBox title="Nothing matches">Try fewer words, or take a filter off.</EmptyBox> : (
           <Box>
             {shown.map(c => (
-              <button key={c.id} type="button" onClick={() => setEditing(c)}
-                className="block w-full border-b border-divider px-4 py-3 text-left last:border-b-0 hover:bg-hover">
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className={c.active ? "text-[17px] font-medium" : "text-[17px] font-medium text-ink-3 line-through"}>{c.title}</span>
-                  <Badge tone={SEVERITY[c.severity].tone}>{SEVERITY[c.severity].label}</Badge>
-                  <Badge tone="muted">{c.complianceDays === 0 ? "Same day" : `${c.complianceDays} days`}</Badge>
-                </span>
-                <span className="block text-[15px] text-ink-3">{c.code} · {c.description}</span>
-              </button>
+              <OpenRow
+                key={c.id} title={c.title} muted={!c.active} onOpen={() => setEditing(c)} state={rowState(c, savedById.get(c.id))}
+                tags={<><Badge tone={SEVERITY[c.severity].tone}>{SEVERITY[c.severity].label}</Badge>{!c.active && <Off />}</>}
+                detail={[c.code, c.description].filter(Boolean).join(" · ")}
+                aside={dueText(c.complianceDays)}
+              />
             ))}
           </Box>
         )}
       </Group>
-      {editing && <CodeDialog code={editing === "new" ? null : editing} onClose={() => setEditing(null)} onDone={c => { put(c); setEditing(null); }} />}
-      <SaveBar dirty={d.dirty} saving={d.saving} onSave={() => void d.save()} onReset={d.reset} />
-    </div>
+
+      {editing && (
+        <CodeDialog
+          code={editing === "new" ? null : editing} onClose={() => setEditing(null)}
+          onDone={c => { put(c); setEditing(null); }}
+          onRemove={editing !== "new" && !savedById.has(editing.id)
+            ? () => { set("violationCodes", codes.filter(x => x.id !== editing.id)); setEditing(null); }
+            : undefined}
+        />
+      )}
+    </>
   );
 }
 
-function CodeDialog({ code, onClose, onDone }: { code: ViolationCode | null; onClose: () => void; onDone: (c: ViolationCode) => void }) {
+function CodeDialog({ code, onClose, onDone, onRemove }: {
+  code: ViolationCode | null; onClose: () => void; onDone: (c: ViolationCode) => void; onRemove?: () => void;
+}) {
   const [c, setC] = useState<ViolationCode>(code ?? {
     id: `custom_${Math.random().toString(36).slice(2, 8)}`, code: "", title: "", description: "", correctiveAction: "",
     severity: "minor", complianceDays: 30, active: true,
   });
-  const set = (p: Partial<ViolationCode>) => setC(x => ({ ...x, ...p }));
+  const put = (p: Partial<ViolationCode>) => setC(x => ({ ...x, ...p }));
+  const daysError = rangeError(c.complianceDays, 0, 365, "days");
   return (
-    <Modal open onClose={onClose} title={code ? "Edit the code" : "Add a code"} size="lg"
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" size="lg" disabled={!c.title.trim()} onClick={() => onDone({ ...c, title: c.title.trim() })}><Save className="h-5 w-5" />Done</Button>
-      </>}
+    <EditDialog
+      title={code ? "Change the code" : "Add a code"} onClose={onClose} onRemove={onRemove}
+      canDone={!!c.title.trim() && !daysError}
+      onDone={() => onDone({ ...c, title: c.title.trim(), code: c.code.trim() })}
     >
-      <div className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
-          <Field label="Code section"><Input value={c.code} onChange={e => set({ code: e.target.value })} placeholder="IFC 1031.2" /></Field>
-          <Field label="Title (the violation)" required><Input value={c.title} onChange={e => set({ title: e.target.value })} /></Field>
-        </div>
-        <Field label="What the code requires"><Textarea value={c.description} onChange={e => set({ description: e.target.value })} /></Field>
-        <Field label="How to correct it" hint="Printed on the notice."><Textarea value={c.correctiveAction} onChange={e => set({ correctiveAction: e.target.value })} /></Field>
-        <div>
-          <span className="mb-1.5 block text-[15px] font-medium">How serious</span>
-          <Segmented value={c.severity} onChange={(s: Severity) => set({ severity: s })}
-            options={(Object.keys(SEVERITY) as Severity[]).map(s => ({ value: s, label: SEVERITY[s].label, tone: SEVERITY[s].tone }))} />
-        </div>
-        <Field label="Days to fix" hint="0 means the same day.">
-          <Input type="number" min={0} max={365} className="w-28" value={c.complianceDays} onChange={e => set({ complianceDays: Math.max(0, Math.min(365, Number(e.target.value) || 0)) })} />
-        </Field>
-        <Toggle checked={c.active} onChange={active => set({ active })} label="In use" description="Off: kept, but not offered when writing a violation." />
+      <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
+        <Field label="Code section"><Input value={c.code} maxLength={60} onChange={e => put({ code: e.target.value })} placeholder="IFC 1031.2" /></Field>
+        <Field label="The violation" required><Input value={c.title} maxLength={200} onChange={e => put({ title: e.target.value })} placeholder="Exit blocked" /></Field>
       </div>
-    </Modal>
+      <Field label="What the code requires"><Textarea value={c.description} maxLength={2000} onChange={e => put({ description: e.target.value })} /></Field>
+      <Field label="How to correct it" hint="Printed on the notice."><Textarea value={c.correctiveAction} maxLength={2000} onChange={e => put({ correctiveAction: e.target.value })} /></Field>
+      <div>
+        <span className="mb-1.5 block text-[15px] font-medium">How serious</span>
+        <Segmented value={c.severity} onChange={(s: Severity) => put({ severity: s })}
+          options={SEVERITIES.map(s => ({ value: s, label: SEVERITY[s].label, tone: SEVERITY[s].tone }))} />
+        <p className="mt-1.5 text-[14px] leading-5 text-ink-3">{SEVERITY[c.severity].help}</p>
+      </div>
+      <NumberField label="Days to fix" unit="days" min={0} max={365} hint="0 means the same day." error={daysError}
+        value={c.complianceDays} onChange={v => put({ complianceDays: v })} />
+      <Toggle checked={c.active} onChange={active => put({ active })} label="In use" description="Off: kept, but not offered when writing a violation." />
+    </EditDialog>
   );
 }

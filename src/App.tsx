@@ -16,6 +16,7 @@ import { InspectionReport } from "./pages/print/InspectionReport";
 import { ViolationNotice } from "./pages/print/ViolationNotice";
 import { BusinessesPage } from "./pages/businesses/BusinessesPage";
 import { BusinessPage } from "./pages/businesses/BusinessPage";
+import { BusinessPrint } from "./pages/print/BusinessPrint";
 import { ViolationsPage } from "./pages/violations/ViolationsPage";
 import { PermitsPage } from "./pages/permits/PermitsPage";
 import { PermitPage } from "./pages/permits/PermitPage";
@@ -80,6 +81,7 @@ export function App() {
           <Route path="/inspections/:id">{p => <InspectionPage id={Number(p.id)} />}</Route>
 
           <Route path="/businesses"><BusinessesPage /></Route>
+          <Route path="/businesses/:id/print">{p => <BusinessPrint id={Number(p.id)} />}</Route>
           <Route path="/businesses/:id">{p => <BusinessPage id={Number(p.id)} />}</Route>
 
           <Route path="/violations"><ViolationsPage /></Route>

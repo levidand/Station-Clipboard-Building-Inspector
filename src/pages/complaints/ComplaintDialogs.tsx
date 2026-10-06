@@ -23,7 +23,6 @@ function Fields({ f, set, isNew }: { f: Form; set: (p: Partial<Form>) => void; i
     <div className="space-y-5">
       <Field label="What it's about" required>
         <Select value={f.typeKey} onChange={e => set({ typeKey: e.target.value })}>
-          <option value="">Pick one…</option>
           {types.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
         </Select>
       </Field>

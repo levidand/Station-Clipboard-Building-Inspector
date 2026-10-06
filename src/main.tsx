@@ -6,6 +6,7 @@ import "./index.css";
 import { App } from "./App";
 import { AuthProvider } from "./lib/auth";
 import { Toaster } from "./components/toast";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { isTransient } from "./lib/api";
 
 const queryClient = new QueryClient({
@@ -27,7 +28,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>

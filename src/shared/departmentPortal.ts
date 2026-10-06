@@ -31,15 +31,41 @@ export interface PortalApp {
 
 export const DEPARTMENT_PORTAL_URL = (import.meta.env.VITE_DEPARTMENT_PORTAL_URL as string | undefined) || "https://go.stationclipboard.com";
 
-/**
- * Department Portal pages open in one tab of their own, reused on every click,
- * so going back and forth doesn't pile up tabs. (The Department Portal opens
- * this app the same way, in a window it names.)
- */
-export const DEPARTMENT_PORTAL_WINDOW = "stationclipboard-department-portal";
-
 export function departmentPortalHref(path = "/dashboard"): string {
   return DEPARTMENT_PORTAL_URL + path;
+}
+
+/**
+ * A page in the Command Portal or the Inspection Portal, opened signed in: the
+ * Department Portal's GET /api/auth/<portal> hands the member across, as its
+ * own sidebar does.
+ */
+export function signedInHref(portal: "command-portal" | "inspection-portal", path = "/"): string {
+  return `${DEPARTMENT_PORTAL_URL}/api/auth/${portal}?path=${encodeURIComponent(path)}`;
+}
+
+export type PortalName = "department-portal" | "command-portal" | "inspection-portal";
+
+/** Phone browsers say "Mobi" (iPhones also "iPhone"); tablets don't, and iPadOS poses as a Mac. */
+const PHONE = typeof navigator !== "undefined"
+  && /Mobi|iPhone|iPod/i.test(navigator.userAgent) && !/iPad|Tablet/i.test(navigator.userAgent);
+
+/**
+ * Where a link to another portal opens. On a computer or a tablet the
+ * Department, Command and Inspection Portals take turns in one tab: switching
+ * replaces the page and Back comes home, so `undefined`, this tab. A phone
+ * keeps a tab for each, named so a second tap reuses it instead of piling up
+ * tabs. The Department Portal follows the same rule (lib/portalTabs.ts there).
+ */
+export function portalTarget(portal: PortalName): string | undefined {
+  return PHONE ? `stationclipboard-${portal}` : undefined;
+}
+
+/** Goes to another portal from code, the way portalTarget says. */
+export function openPortal(href: string, portal: PortalName): void {
+  const target = portalTarget(portal);
+  if (target) window.open(href, target);
+  else window.location.assign(href);
 }
 
 /** Same check as the Department Portal's can(): no super-admin shortcut, the server already lists every grant. */

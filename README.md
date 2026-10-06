@@ -21,8 +21,8 @@ permission. The demo department is on the 2018 fire code, as Iowa Colony is. `PO
 demo back to where it started.
 
 Settings go in `.env` (copy `.env.example`): `API_TARGET` (the Department Portal API, default
-`https://go.stationclipboard.com`), `PORT` (default 4710), `VITE_DEPARTMENT_PORTAL_URL`,
-`VITE_COMMAND_PORTAL_URL` and `ARCGIS_API_KEY` (address lookup; works without one).
+`https://go.stationclipboard.com`), `PORT` (default 4710), `VITE_DEPARTMENT_PORTAL_URL` (its links, and the
+signed-in way into the Command Portal) and `ARCGIS_API_KEY` (address lookup; works without one).
 
 ## How it connects
 

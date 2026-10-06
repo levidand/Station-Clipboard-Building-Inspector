@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { CheckCircle2, ClipboardPlus, FilePlus2, MoreHorizontal, Pencil, Printer, RotateCcw, Send, Trash2 } from "lucide-react";
+import { CheckCircle2, ClipboardPlus, FilePlus2, Gavel, Hammer, Pencil, Printer, RotateCcw, Search, Send, Trash2 } from "lucide-react";
 import { api, errorMessage, get } from "@/lib/api";
 import { usePermissions } from "@/lib/auth";
 import { dateTime, formatDay, relativeDay } from "@/lib/format";
 import { BASE, CASE_PRIORITY, CASE_RESOLUTION, CASE_SOURCE, CASE_STATUS, keys, typeLabel, useRefreshAll, useSettings } from "@/lib/inspections";
 import type { CaseDetail, CaseStatus } from "@/lib/types";
-import { Badge, Button, Menu, MenuItem } from "@/components/ui";
-import { Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
+import { Badge, Button } from "@/components/ui";
+import { ActionMenu, Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
 import { FilesPanel, HistoryPanel, InspectionListRow, ScheduleDialog, ViolationLine } from "@/components/records";
 import { ViolationDialog, type ViolationDraft } from "@/components/ViolationDialog";
 import { toast } from "@/components/toast";
@@ -22,7 +22,6 @@ export function ComplaintPage({ id }: { id: number }) {
   const [, navigate] = useLocation();
   const q = useQuery({ queryKey: keys.case(id), queryFn: ({ signal }) => get<CaseDetail>(`${BASE}/cases/${id}`, signal) });
   const [dialog, setDialog] = useState<null | "notice" | "close" | "edit" | "visit" | "violation" | "delete">(null);
-  const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const d = q.data;
   const saved = (next: CaseDetail) => { qc.setQueryData(keys.case(id), next); void refresh(); };
@@ -57,26 +56,28 @@ export function ComplaintPage({ id }: { id: number }) {
           {d.overdue && <Badge tone="danger">Past its date</Badge>}
         </>}
       >
-        {perms.cases && !closed && <>
-          <Button variant="primary" size="lg" onClick={() => setDialog("visit")}><ClipboardPlus className="h-5 w-5" />Schedule a visit</Button>
-          <Button size="lg" onClick={() => setDialog("notice")}><Send className="h-5 w-5" />Record a notice</Button>
-          <Button size="lg" variant="ok" onClick={() => setDialog("close")}><CheckCircle2 className="h-5 w-5" />Close it</Button>
-        </>}
-        {d.notices.length > 0 && <Button size="lg" onClick={() => navigate(`/complaints/${id}/notice`)}><Printer className="h-5 w-5" />Print the notice</Button>}
-        {perms.cases && closed && <Button size="lg" loading={busy} onClick={() => setStatus("open")}><RotateCcw className="h-5 w-5" />Reopen</Button>}
-        {perms.cases && (
-          <div className="relative">
-            <Button size="lg" variant="ghost" onClick={() => setMenu(m => !m)} aria-label="More"><MoreHorizontal className="h-6 w-6" /></Button>
-            <Menu open={menu} onClose={() => setMenu(false)}>
-              <MenuItem icon={Pencil} onClick={() => { setMenu(false); setDialog("edit"); }}>Change the details</MenuItem>
-              {!closed && <MenuItem icon={FilePlus2} onClick={() => { setMenu(false); setDialog("violation"); }}>Write a violation</MenuItem>}
-              {!closed && d.status !== "investigating" && <MenuItem onClick={() => { setMenu(false); void setStatus("investigating"); }}>Mark "Looking into it"</MenuItem>}
-              {!closed && d.status !== "cited" && <MenuItem onClick={() => { setMenu(false); void setStatus("cited"); }}>Mark cited</MenuItem>}
-              {!closed && d.status !== "abatement" && <MenuItem onClick={() => { setMenu(false); void setStatus("abatement"); }}>Send for abatement</MenuItem>}
-              {perms.settings && <MenuItem icon={Trash2} danger onClick={() => { setMenu(false); setDialog("delete"); }}>Delete</MenuItem>}
-            </Menu>
-          </div>
-        )}
+        <ActionMenu sections={[
+          { title: "Next step", items: perms.cases && !closed ? [
+            { label: "Schedule a visit", icon: ClipboardPlus, tone: "brand", hint: "A site visit or a re-check, on the calendar.", onClick: () => setDialog("visit") },
+            { label: "Write a violation", icon: FilePlus2, tone: "warn", hint: "What's wrong, the code, and the date to fix it by.", onClick: () => setDialog("violation") },
+            { label: "Record a notice", icon: Send, hint: "Write down that the owner was told, and how.", onClick: () => setDialog("notice") },
+            { label: "Close it", icon: CheckCircle2, tone: "ok", hint: "Fixed, unfounded, or sent to someone else.", onClick: () => setDialog("close") },
+          ] : [] },
+          { title: "Print", items: [
+            d.notices.length > 0 && { label: "Print the notice", icon: Printer, hint: "The letter to the owner, with the violations.", onClick: () => navigate(`/complaints/${id}/notice`) },
+          ] },
+          { title: "Status", items: !perms.cases ? [] : closed ? [
+            { label: "Reopen", icon: RotateCcw, hint: "It goes back on the open list.", onClick: () => void setStatus("open") },
+          ] : [
+            d.status !== "investigating" && { label: "Mark \"Looking into it\"", icon: Search, onClick: () => void setStatus("investigating") },
+            d.status !== "cited" && { label: "Mark cited", icon: Gavel, onClick: () => void setStatus("cited") },
+            d.status !== "abatement" && { label: "Send for abatement", icon: Hammer, hint: "The city fixes it and bills the owner.", onClick: () => void setStatus("abatement") },
+          ] },
+          { items: [
+            perms.cases && { label: "Change the details", icon: Pencil, onClick: () => setDialog("edit") },
+            perms.settings && { label: "Delete the complaint", icon: Trash2, danger: true, onClick: () => setDialog("delete") },
+          ] },
+        ]} />
       </PageHead>
 
       <Group title="The complaint">

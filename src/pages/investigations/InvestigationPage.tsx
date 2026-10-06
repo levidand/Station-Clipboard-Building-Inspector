@@ -8,7 +8,7 @@ import { dateTime, fromLocalInput, money, toLocalInput } from "@/lib/format";
 import { BASE, CAUSE_CLASS, INVESTIGATION_STATUS, NERIS_CAUSES, keys, useRefreshAll } from "@/lib/inspections";
 import type { CauseClass, EvidenceItem, Interview, InvestigationDetail, InvestigationStatus } from "@/lib/types";
 import { Badge, Button, Checkbox, Field, Input, Modal, MoneyInput, Select, Textarea } from "@/components/ui";
-import { Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
+import { ActionMenu, Box, Confirm, Fact, Facts, Group, Note, PAGE, PageHead, QueryState } from "@/components/kit";
 import { FilesPanel, HistoryPanel, PersonSelect } from "@/components/records";
 import { toast } from "@/components/toast";
 import { PROPERTY_TYPES } from "./InvestigationsPage";
@@ -53,13 +53,23 @@ export function InvestigationPage({ id }: { id: number }) {
           <Badge tone="warn"><Lock className="h-4 w-4" />Confidential</Badge>
         </>}
       >
-        {d.status !== "closed" && <>
-          <Button variant="primary" size="lg" onClick={() => setDialog("cause")}><Pencil className="h-5 w-5" />Origin and cause</Button>
-          {d.status === "open" && <Button size="lg" onClick={() => setStatus("pending", "Marked waiting")}><Hourglass className="h-5 w-5" />Waiting on lab or info</Button>}
-          {d.status === "pending" && <Button size="lg" onClick={() => setStatus("open", "Back to open")}><RotateCcw className="h-5 w-5" />Back to open</Button>}
-          <Button size="lg" variant="ok" onClick={() => setStatus("closed", "Closed")}><CheckCircle2 className="h-5 w-5" />Close it</Button>
-        </>}
-        {d.status === "closed" && <Button size="lg" onClick={() => setStatus("open", "Reopened")}><RotateCcw className="h-5 w-5" />Reopen</Button>}
+        <ActionMenu sections={[
+          { title: "Next step", items: d.status === "closed" ? [] : [
+            { label: "Origin and cause", icon: Pencil, tone: "brand", hint: "Where it started, what lit it, and the cause.", onClick: () => setDialog("cause") },
+            { label: "Log evidence", icon: Plus, onClick: () => setDialog("evidence") },
+            { label: "Add an interview", icon: Plus, onClick: () => setDialog("interview") },
+          ] },
+          { title: "Status", items: [
+            d.status === "open" && { label: "Waiting on lab or information", icon: Hourglass, onClick: () => void setStatus("pending", "Marked waiting") },
+            d.status === "pending" && { label: "Back to open", icon: RotateCcw, onClick: () => void setStatus("open", "Back to open") },
+            d.status !== "closed" && { label: "Close it", icon: CheckCircle2, tone: "ok", onClick: () => void setStatus("closed", "Closed") },
+            d.status === "closed" && { label: "Reopen", icon: RotateCcw, onClick: () => void setStatus("open", "Reopened") },
+          ] },
+          { items: [
+            { label: "Change the details of the fire", icon: Pencil, onClick: () => setDialog("details") },
+            perms.settings && { label: "Delete the investigation", icon: Trash2, danger: true, onClick: () => setDialog("delete") },
+          ] },
+        ]} />
       </PageHead>
 
       <Group title="The fire" actions={<Button size="sm" variant="ghost" onClick={() => setDialog("details")}><Pencil className="h-4 w-4" />Change</Button>}>
@@ -157,12 +167,6 @@ export function InvestigationPage({ id }: { id: number }) {
         <HistoryPanel history={d.history} kind="investigations" id={id} canWrite
           onChange={h => qc.setQueryData<InvestigationDetail>(keys.investigation(id), cur => (cur ? { ...cur, history: h } : cur))} />
       </Group>
-
-      {perms.settings && (
-        <div className="border-t border-divider pt-6">
-          <Button variant="decline" onClick={() => setDialog("delete")}><Trash2 className="h-5 w-5" />Delete this investigation</Button>
-        </div>
-      )}
 
       {dialog === "cause" && <CauseDialog d={d} onClose={() => setDialog(null)} onSave={patch} />}
       {dialog === "details" && <DetailsDialog d={d} onClose={() => setDialog(null)} onSave={patch} />}

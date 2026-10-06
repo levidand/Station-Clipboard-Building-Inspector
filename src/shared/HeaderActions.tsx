@@ -10,7 +10,7 @@ import { api, errorMessage, get } from "@/lib/api";
 import { useAuth, type Session } from "@/lib/auth";
 import { dateTime } from "@/lib/format";
 import {
-  DEPARTMENT_PORTAL_WINDOW, appGradient, availableApps, departmentPortalHref, notificationDestination,
+  appGradient, availableApps, departmentPortalHref, notificationDestination, openPortal, portalTarget,
   type Notification, type NotificationList, type OrgModule,
 } from "./departmentPortal";
 import { Count, Spinner, cx } from "@/components/ui";
@@ -117,7 +117,7 @@ function PanelTop({ title, subtitle, children }: { title: string; subtitle?: Rea
 function PortalFooter({ onClick }: { onClick: () => void }) {
   return (
     <a
-      href={departmentPortalHref()} target={DEPARTMENT_PORTAL_WINDOW} onClick={onClick}
+      href={departmentPortalHref()} target={portalTarget("department-portal")} onClick={onClick}
       className="flex h-12 shrink-0 items-center gap-3 border-t border-divider px-4 text-[14px] text-ink-3 transition-colors hover:bg-white/[.05] hover:text-white"
     >
       <ExternalLink className="h-4 w-4 shrink-0" />Open the Department Portal
@@ -183,7 +183,7 @@ function AppsButton({ session }: { session: Session }) {
                   <button key={app.slug} type="button" className={cls} aria-current="page" title="You're here"
                     onClick={() => { close(); navigate("/"); }}>{tile}</button>
                 ) : (
-                  <a key={app.slug} className={cls} href={departmentPortalHref(app.href)} target={DEPARTMENT_PORTAL_WINDOW} onClick={close}>{tile}</a>
+                  <a key={app.slug} className={cls} href={departmentPortalHref(app.href)} target={portalTarget("department-portal")} onClick={close}>{tile}</a>
                 );
               })}
             </div>
@@ -211,7 +211,7 @@ function ChatButton() {
   const n = unread.data?.total ?? 0;
   return (
     <a
-      href={departmentPortalHref("/modules/chat")} target={DEPARTMENT_PORTAL_WINDOW} className={BAR_BUTTON}
+      href={departmentPortalHref("/modules/chat")} target={portalTarget("department-portal")} className={BAR_BUTTON}
       aria-label={n ? `Chat, ${n} unread` : "Chat"} title={n ? `Chat: ${n} unread` : "Chat"}
     >
       <MessageCircle className="h-5 w-5" />
@@ -321,7 +321,8 @@ function NotificationsButton({ orgId }: { orgId: number }) {
     if (!to) { setExpanded(e => (e === n.id ? null : n.id)); return; }
     hide();
     if (to.kind === "here") navigate(to.path);
-    else window.open(to.href, to.kind === "portal" ? DEPARTMENT_PORTAL_WINDOW : "_blank", to.kind === "web" ? "noopener" : undefined);
+    else if (to.kind === "portal") openPortal(to.href, "department-portal");
+    else window.open(to.href, "_blank", "noopener");
   };
 
   const now = Date.now();

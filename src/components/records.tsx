@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, Camera, CheckCircle2, ExternalLink, FileText, MapPin, Trash2, Upload } from "lucide-react";
+import { Building2, Camera, CheckCircle2, ExternalLink, FileText, Loader2, MapPin, Trash2, Upload } from "lucide-react";
 import { api, errorMessage, get } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { dateTime, formatDay, relativeDay, timeOfDay, todayKey } from "@/lib/format";
+import { portalTarget, signedInHref } from "@/shared/departmentPortal";
+import { dateTime, formatDay, plural, relativeDay, timeOfDay, todayKey } from "@/lib/format";
 import {
   BASE, DISCIPLINE_LABELS, INSPECTION_STATUS, RESULT, SEVERITY, VIOLATION_STATUS, deleteFile, fileUrl, keys, typeLabel,
   uploadFile, useChecklists, usePeople, useRefreshAll, useSettings, type RecordKind,
@@ -13,7 +14,7 @@ import type {
   Discipline, FileRef, HistoryLine, InspectionDetail, InspectionRow, Listed, Person, PropertyRow, Violation,
 } from "@/lib/types";
 import { Badge, Button, Field, IconButton, Input, Modal, Segmented, Select, Textarea, TONE_EDGE, cx } from "./ui";
-import { Box, EmptyBox, ListRow, Note, NoteComposer } from "./kit";
+import { ActionMenu, Box, EmptyBox, ListRow, Note, NoteComposer } from "./kit";
 import { toast } from "./toast";
 
 // ---------------------------------------------------------------------------
@@ -83,8 +84,10 @@ export function PlacePicker({ value, onChange, allowAddress = true, addressOnly 
   const matches = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
     if (!words.length) return [];
-    return (props.data?.rows ?? []).filter(p => words.every(w => `${p.name} ${p.address}`.toLowerCase().includes(w))).slice(0, 8);
+    return (props.data?.rows ?? []).filter(p => words.every(w => `${p.name} ${p.address}`.toLowerCase().includes(w)));
   }, [q, props.data]);
+  // The best few, shown whole: a little scroll box inside a dialog is hard to work on a tablet.
+  const shown = matches.slice(0, 6);
   const [looking, setLooking] = useState(false);
 
   async function lookUp() {
@@ -128,12 +131,12 @@ export function PlacePicker({ value, onChange, allowAddress = true, addressOnly 
           <div>
             <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Type part of the business name or address" autoFocus />
             {q.trim() && (
-              <Box className="mt-1 max-h-72 overflow-y-auto">
+              <Box className="mt-1">
                 {matches.length === 0 ? (
                   <p className="px-4 py-3 text-[15px] text-ink-3">
                     No business matches.{allowAddress ? " Choose “An address” to type it in, or add the business on the Businesses page." : ""}
                   </p>
-                ) : matches.map(p => (
+                ) : shown.map(p => (
                   <button
                     key={p.preplanId} type="button"
                     onClick={() => { onChange({ preplanId: p.preplanId, placeName: p.name, address: p.address, latitude: p.latitude, longitude: p.longitude }); setQ(""); }}
@@ -143,6 +146,11 @@ export function PlacePicker({ value, onChange, allowAddress = true, addressOnly 
                     <span className="block text-[15px] text-ink-3">{p.address}</span>
                   </button>
                 ))}
+                {matches.length > shown.length && (
+                  <p className="border-t border-divider px-4 py-2.5 text-[15px] text-ink-3">
+                    {matches.length - shown.length} more {matches.length - shown.length === 1 ? "business matches" : "businesses match"}. Keep typing to narrow it down.
+                  </p>
+                )}
               </Box>
             )}
           </div>
@@ -272,9 +280,12 @@ export function FilesPanel({ kind, id, files, canEdit, onChange }: {
   return (
     <div>
       {canEdit && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => camera.current?.click()} loading={busy > 0}><Camera className="h-5 w-5" />Take a photo</Button>
-          <Button onClick={() => picker.current?.click()} disabled={busy > 0}><Upload className="h-5 w-5" />Add a file</Button>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <ActionMenu label="Add photos or files" size="md" sections={[{ items: [
+            { label: "Take a photo", icon: Camera, tone: "brand", hint: "Opens the camera. Each one is sent as soon as it's taken.", onClick: () => camera.current?.click() },
+            { label: "Choose photos or files", icon: Upload, hint: "From this device: pictures, or a PDF.", onClick: () => picker.current?.click() },
+          ] }]} />
+          {busy > 0 && <span className="inline-flex items-center gap-2 text-[15px] text-ink-2"><Loader2 className="h-5 w-5 animate-spin" />Sending {plural(busy, "file")}…</span>}
           <input ref={camera} type="file" accept="image/*" capture="environment" multiple hidden onChange={e => { void send(e.target.files); e.target.value = ""; }} />
           <input ref={picker} type="file" accept="image/*,application/pdf" multiple hidden onChange={e => { void send(e.target.files); e.target.value = ""; }} />
         </div>
@@ -466,11 +477,11 @@ function ScheduleForm({ onClose, preset }: { onClose: () => void; preset: Schedu
  * crews keep it. The Command Portal has no address for one preplan, so this
  * opens the list; the business is found there by name.
  */
-export const PREPLANS_URL = `${(import.meta.env.VITE_COMMAND_PORTAL_URL as string | undefined) || "https://cmd.stationclipboard.com"}/settings/preplans`;
+export const PREPLANS_URL = signedInHref("command-portal", "/settings/preplans");
 
 export function PreplanLink({ label = "Edit the preplan in the Command Portal" }: { label?: string }) {
   return (
-    <a href={PREPLANS_URL} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center gap-2 text-[16px] text-sky hover:underline">
+    <a href={PREPLANS_URL} target={portalTarget("command-portal")} className="inline-flex min-h-11 items-center gap-2 text-[16px] text-sky hover:underline">
       <ExternalLink className="h-4 w-4" />{label}
     </a>
   );

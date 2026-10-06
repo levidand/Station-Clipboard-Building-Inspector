@@ -12,7 +12,7 @@ export const MAP_BASES: Record<MapBase, { layers: string[]; attribution: string 
 
 export const MAP_COLORS = {
   overdue: "#c62828", due_soon: "#ff9800", current: "#7cb342", none: "#9e9e9e",
-  hydrant: "#64b5f6", hydrantOut: "#f08080", complaint: "#ffc629", inspection: "#ffffff",
+  hydrant: "#64b5f6", hydrantOut: "#757575", complaint: "#ffc629", inspection: "#1976d2",
 };
 
 /** Straight-line distance in feet. */
