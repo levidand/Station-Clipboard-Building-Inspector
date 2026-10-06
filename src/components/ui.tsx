@@ -647,7 +647,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([t
  * opens (to a field marked autoFocus, else the dialog itself), Tab wraps round
  * inside it, and focus goes back to whatever opened it when it closes.
  */
-function useFocusTrap(open: boolean, box: RefObject<HTMLElement | null>) {
+export function useFocusTrap(open: boolean, box: RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!open) return;
     const before = document.activeElement as HTMLElement | null;

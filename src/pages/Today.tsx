@@ -1,13 +1,13 @@
 import { useState, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { AlertTriangle, Building2, CalendarDays, ClipboardPlus, Flame, Megaphone, Stamp } from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, ChevronRight, ClipboardPlus, Flame, Megaphone, Stamp } from "lucide-react";
 import { get } from "@/lib/api";
 import { useAuth, usePermissions } from "@/lib/auth";
 import { addDays, dateTime, formatDay, relativeDay } from "@/lib/format";
 import { BASE, CASE_STATUS, EVENT_KIND, PERMIT_STATUS, keys, typeLabel, useSettings } from "@/lib/inspections";
 import type { InspectionRow, Today } from "@/lib/types";
-import { Badge, Button, TONE_EDGE, cx, type Tone } from "@/components/ui";
+import { Badge, Button, TONE_EDGE, TONE_TEXT, cx, type Tone } from "@/components/ui";
 import { Box, EmptyBox, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
 import { InspectionListRow, ScheduleDialog, ViolationLine } from "@/components/records";
 
@@ -34,7 +34,7 @@ export function TodayPage() {
       <QueryState query={q}>
         {t && (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
               <Tile href="/businesses?due=overdue" icon={Building2} count={t.counts.propertiesOverdue} tone="danger"
                 label="Businesses overdue" detail={`${t.counts.propertiesDueSoon} more due in 30 days`} />
               <Tile href="/violations?status=overdue" icon={AlertTriangle} count={t.counts.violationsOverdue} tone="danger"
@@ -43,13 +43,14 @@ export function TodayPage() {
                 label="Complaints due" detail={`${t.counts.casesOpen} open in all`} />
               <Tile href="/permits?status=waiting" icon={Stamp} count={t.counts.permitsWaiting} tone="brand"
                 label="Permits waiting" detail={`${t.counts.permitsExpiring} expiring within 30 days`} />
-              <Tile href="/events" icon={CalendarDays} count={t.counts.eventsUpcoming} tone="info"
+              <Tile href="/events" icon={CalendarDays} count={t.counts.eventsUpcoming} tone="info" className="col-span-2 sm:col-span-1"
                 label="Events coming up" detail="In the next six weeks" />
             </div>
             {perms.investigations && t.counts.investigationsOpen > 0 && (
-              <Link href="/investigations" className="flex min-h-14 items-center gap-3 border border-faded bg-odd px-4 py-3 text-[17px] hover:bg-hover">
-                <Flame className="h-6 w-6 text-orange" />
-                {t.counts.investigationsOpen} fire investigation{t.counts.investigationsOpen === 1 ? "" : "s"} still open
+              <Link href="/investigations" className={cx("flex min-h-14 items-center gap-3 border border-l-4 border-faded bg-odd px-4 py-3 text-[17px] transition-colors hover:bg-hover", TONE_EDGE.warn)}>
+                <Flame className="h-6 w-6 shrink-0 text-orange" />
+                <span className="min-w-0 flex-1">{t.counts.investigationsOpen} fire investigation{t.counts.investigationsOpen === 1 ? "" : "s"} still open</span>
+                <ChevronRight className="h-6 w-6 shrink-0 text-ink-4" />
               </Link>
             )}
 
@@ -127,18 +128,21 @@ export function TodayPage() {
   );
 }
 
-function Tile({ href, icon: Icon, count, label, detail, tone }: {
-  href: string; icon: ComponentType<{ className?: string }>; count: number; label: string; detail: string; tone: Tone;
+/** A count that opens its list: what it counts on top, the number, then one line of context. Laid out like a business's tiles. */
+function Tile({ href, icon: Icon, count, label, detail, tone, className }: {
+  href: string; icon: ComponentType<{ className?: string }>; count: number; label: string; detail: string; tone: Tone; className?: string;
 }) {
   const zero = count === 0;
   return (
-    <Link href={href} className={cx("flex items-center gap-4 border border-l-4 border-faded bg-odd px-4 py-4 transition-colors hover:bg-hover", zero ? "border-l-faded" : TONE_EDGE[tone])}>
-      <Icon className={cx("h-8 w-8 shrink-0", zero ? "text-ink-4" : "text-ink-2")} />
-      <div className="min-w-0">
-        <div className={cx("text-[34px] font-medium leading-none tabular-nums", zero ? "text-ink-3" : "text-ink")}>{count}</div>
-        <div className="mt-1 text-[16px] font-medium text-ink">{label}</div>
-        <div className="text-[14px] text-ink-3">{detail}</div>
-      </div>
+    <Link
+      href={href}
+      className={cx("flex min-h-[124px] min-w-0 flex-col border border-l-4 border-faded bg-odd px-4 py-3 transition-colors hover:bg-hover", zero ? "border-l-faded" : TONE_EDGE[tone], className)}
+    >
+      <span className="flex items-start gap-2 text-[15px] font-medium leading-5 text-ink-2">
+        <Icon className={cx("mt-px h-5 w-5 shrink-0", zero ? "text-ink-4" : TONE_TEXT[tone])} />{label}
+      </span>
+      <span className={cx("mt-2 text-[36px] font-medium leading-none tabular-nums", zero ? "text-ink-3" : "text-ink")}>{count}</span>
+      <span className="mt-auto pt-2 text-[14px] leading-5 text-ink-3">{detail}</span>
     </Link>
   );
 }

@@ -70,7 +70,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </button>
         )}
       >
-        <div className="flex min-w-0 flex-1 justify-center sm:px-2"><GlobalSearch /></div>
+        <div className="flex min-w-0 flex-1 justify-center lg:px-2"><GlobalSearch /></div>
       </AppHeader>
 
       <div className="flex min-h-0 flex-1">
@@ -146,8 +146,9 @@ function PortalLinks() {
 
 /**
  * One box that finds a business, an inspection, a permit, a complaint or an
- * event by name, number or address. A phone has no room for it beside the
- * title bar's buttons, so there it's a button that opens the box over the bar.
+ * event by name, number or address. Below a laptop's width there's no room
+ * for a box worth typing in beside the title bar's buttons, so there it's a
+ * button that opens the box across the whole bar.
  */
 function GlobalSearch() {
   const [, navigate] = useLocation();
@@ -187,14 +188,14 @@ function GlobalSearch() {
 
   return (
     <>
-      <IconButton label="Search" onClick={() => setWide(true)} className="ml-auto text-ink-2 hover:text-white sm:hidden">
+      <IconButton label="Search" onClick={() => setWide(true)} className="ml-auto text-ink-2 hover:text-white lg:hidden">
         <Search className="h-6 w-6" />
       </IconButton>
       <div
         ref={box}
         className={cx(
           "relative w-full max-w-xl",
-          wide ? "fixed inset-x-0 top-0 z-40 flex h-14 max-w-none items-center gap-1 bg-navy px-2 shadow-bar" : "hidden sm:block",
+          wide ? "fixed inset-x-0 top-0 z-40 flex h-14 max-w-none items-center gap-1 bg-navy px-2 shadow-bar" : "hidden lg:block",
         )}
       >
         <div className="relative min-w-0 flex-1">

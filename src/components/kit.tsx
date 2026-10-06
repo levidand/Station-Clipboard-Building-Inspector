@@ -8,7 +8,8 @@ import {
 import { errorMessage, ApiError } from "@/lib/api";
 import { portalTarget, type PortalName } from "@/shared/departmentPortal";
 import {
-  Button, Count, Field, IconButton, Input, Modal, Select, Spinner, TONE_TEXT, Textarea, cx, floatPlace, useEscape, type IconType, type Tone,
+  Button, Count, Field, IconButton, Input, Modal, Select, Spinner, TONE_TEXT, Textarea, cx, floatPlace, useEscape, useFocusTrap,
+  type IconType, type Tone,
 } from "./ui";
 
 /*
@@ -184,12 +185,16 @@ function useFloating(
   }, [open, anchor, panel, align]);
   useEffect(() => {
     if (!open) return;
-    const onScroll = (e: Event) => { if (!panel.current?.contains(e.target as Node)) lost.current(); };
+    // Only a scroll that moves the button counts: not one inside the panel, or in a drop-down list opened from it.
+    const onScroll = (e: Event) => {
+      const t = e.target as Node;
+      if (anchor.current && (t === document || t.contains?.(anchor.current))) lost.current();
+    };
     const onResize = () => lost.current();
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onResize);
     return () => { window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", onResize); };
-  }, [open, panel]);
+  }, [open, anchor]);
   return place;
 }
 
@@ -493,6 +498,7 @@ export function FilterBar({ search, filters }: {
   const panel = useRef<HTMLDivElement>(null);
   const close = (refocus = false) => { setOpen(false); if (refocus) button.current?.focus(); };
   useEscape(open, () => close(true));
+  useFocusTrap(open, panel);
   const place = useFloating(open && !sheet, button, panel, "end", () => close());
   const on = filters.filter(f => f.value !== f.empty);
   const labelOf = (f: FilterDef) => f.options.find(o => o.value === f.value)?.label ?? f.value;
