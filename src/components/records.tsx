@@ -204,7 +204,7 @@ export function InspectionListRow({ row, today, showPlace = true }: { row: Inspe
 }
 
 /** A violation, as a line in a list. */
-export function ViolationLine({ v, action }: { v: Violation; action?: ReactNode }) {
+export function ViolationLine({ v, action, tags }: { v: Violation; action?: ReactNode; tags?: ReactNode }) {
   const status = VIOLATION_STATUS[v.status];
   return (
     <div className={cx("flex flex-col gap-2 border-b border-l-4 border-b-divider px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-start", v.overdue ? TONE_EDGE.danger : v.status === "open" ? TONE_EDGE.warn : "border-l-transparent")}>
@@ -214,6 +214,7 @@ export function ViolationLine({ v, action }: { v: Violation; action?: ReactNode 
           <Badge tone={status.tone}>{status.label}</Badge>
           <Badge tone={SEVERITY[v.severity].tone}>{SEVERITY[v.severity].label}</Badge>
           {v.overdue && <Badge tone="danger">Past due</Badge>}
+          {tags}
         </div>
         <div className="mt-1 text-[15px] leading-6 text-ink-2">
           {[v.codeRef, v.location].filter(Boolean).join(" · ")}
@@ -465,10 +466,11 @@ function ScheduleForm({ onClose, preset }: { onClose: () => void; preset: Schedu
  * crews keep it. The Command Portal has no address for one preplan, so this
  * opens the list; the business is found there by name.
  */
+export const PREPLANS_URL = `${(import.meta.env.VITE_COMMAND_PORTAL_URL as string | undefined) || "https://cmd.stationclipboard.com"}/settings/preplans`;
+
 export function PreplanLink({ label = "Edit the preplan in the Command Portal" }: { label?: string }) {
-  const url = (import.meta.env.VITE_COMMAND_PORTAL_URL as string | undefined) || "https://cmd.stationclipboard.com";
   return (
-    <a href={`${url}/settings/preplans`} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center gap-2 text-[16px] text-sky hover:underline">
+    <a href={PREPLANS_URL} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center gap-2 text-[16px] text-sky hover:underline">
       <ExternalLink className="h-4 w-4" />{label}
     </a>
   );

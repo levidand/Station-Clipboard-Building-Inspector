@@ -1,8 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowLeft, ChevronRight, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, ExternalLink, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { errorMessage, ApiError } from "@/lib/api";
-import { Button, Count, Field, IconButton, Input, Modal, Select, Spinner, Textarea, cx, useEscape } from "./ui";
+import {
+  Button, Count, Field, IconButton, Input, Modal, Select, Spinner, TONE_TEXT, Textarea, cx, useEscape, type IconType, type Tone,
+} from "./ui";
 
 /*
  * Page building blocks, laid out the way the Command Portal's Settings and its
@@ -44,12 +46,125 @@ export function PageHead({ title, sub, children, back, badges }: {
   );
 }
 
-/** A titled group of rows. `actions` sit on the right of the title. */
-export function Group({ title, actions, hint, children, className }: {
-  title: ReactNode; actions?: ReactNode; hint?: ReactNode; children: ReactNode; className?: string;
+/** One thing an ActionMenu can do. */
+export interface ActionItem {
+  label: string;
+  icon?: IconType;
+  /** One plain line under the label saying what happens. */
+  hint?: string;
+  onClick?: () => void;
+  /** Opens another site, in a new tab. */
+  href?: string;
+  /** Colours the icon: green for the step the record is waiting on, and so on. */
+  tone?: Tone;
+  danger?: boolean;
+}
+
+/** A titled run of items. `false`/`null` items are skipped, so a permission check can sit inline. */
+export interface ActionSection { title?: string; items: (ActionItem | false | null | undefined)[] }
+
+/**
+ * Everything that can be done to a record, behind one button. Buttons are
+ * never lined up side by side: a row of them reads as noise, and on a tablet
+ * held in one hand the wrong one gets pressed. Each item says in a line what
+ * it does. A panel under the button from a tablet up, a sheet from the bottom
+ * on a phone; it opens upward when the button is low on the screen.
+ */
+export function ActionMenu({ sections, label = "Actions", size = "lg", variant = "primary" }: {
+  sections: ActionSection[]; label?: string; size?: "sm" | "md" | "lg"; variant?: "primary" | "secondary";
+}) {
+  const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const close = (refocus = false) => { setOpen(false); if (refocus) button.current?.focus(); };
+  useEscape(open, () => close(true));
+
+  useEffect(() => {
+    if (open) panel.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus({ preventScroll: true });
+  }, [open]);
+
+  const shown = sections
+    .map(s => ({ title: s.title, items: s.items.filter((a): a is ActionItem => !!a) }))
+    .filter(s => s.items.length > 0);
+  if (shown.length === 0) return null;
+
+  function toggle() {
+    if (open) { setOpen(false); return; }
+    const r = button.current?.getBoundingClientRect();
+    setUp(!!r && window.innerHeight - r.bottom < 380 && r.top > window.innerHeight - r.bottom);
+    setOpen(true);
+  }
+
+  function arrows(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const items = [...(panel.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+  }
+
+  return (
+    <div className="relative">
+      <Button ref={button} variant={variant} size={size} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+        {label}<ChevronDown className={cx(size === "sm" ? "h-4 w-4" : "h-5 w-5", "transition-transform", open && "rotate-180")} />
+      </Button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40 bg-mask/70 sm:bg-transparent" onClick={() => close()} />
+          <div
+            ref={panel} role="menu" aria-label={label} onKeyDown={arrows}
+            className={cx(
+              "fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto bg-surface pb-2 shadow-float",
+              "sm:absolute sm:inset-x-auto sm:right-0 sm:max-h-[min(70vh,640px)] sm:w-[26rem] sm:rounded-sm sm:border sm:border-divider sm:pb-0",
+              up ? "sm:bottom-full sm:mb-2" : "sm:bottom-auto sm:top-full sm:mt-2",
+            )}
+          >
+            <div className="flex items-center justify-between py-1 pl-5 pr-2 sm:hidden">
+              <h2 className="text-[20px] font-medium">{label}</h2>
+              <IconButton label="Close" onClick={() => close(true)}><X className="h-6 w-6" /></IconButton>
+            </div>
+            {shown.map((s, i) => (
+              <div key={s.title ?? i} className={cx("py-1.5", i > 0 && "border-t border-divider")}>
+                {s.title && <div className="px-4 pb-1 pt-2 text-[13px] font-medium uppercase tracking-[0.06em] text-ink-3">{s.title}</div>}
+                {s.items.map(a => <ActionRow key={a.label} a={a} onDone={() => close()} />)}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ActionRow({ a, onDone }: { a: ActionItem; onDone: () => void }) {
+  const Icon = a.icon;
+  const cls = "flex min-h-[60px] w-full items-center gap-4 px-4 py-2.5 text-left transition-colors hover:bg-hover focus-visible:bg-hover focus-visible:outline-none";
+  const body = (
+    <>
+      {Icon && <Icon className={cx("h-6 w-6 shrink-0", a.danger ? "text-lightcoral" : a.tone ? TONE_TEXT[a.tone] : "text-ink-3")} />}
+      <span className="min-w-0 flex-1">
+        <span className={cx("block text-[17px] leading-6", a.danger ? "text-lightcoral" : "text-ink")}>{a.label}</span>
+        {a.hint && <span className="block text-[14px] leading-5 text-ink-3">{a.hint}</span>}
+      </span>
+      {a.href && <ExternalLink className="h-4 w-4 shrink-0 text-ink-4" />}
+    </>
+  );
+  return a.href
+    ? <a role="menuitem" href={a.href} target="_blank" rel="noopener" onClick={onDone} className={cls}>{body}</a>
+    : <button role="menuitem" type="button" onClick={() => { onDone(); a.onClick?.(); }} className={cls}>{body}</button>;
+}
+
+/**
+ * A titled group of rows. `actions` sit on the right of the title. An `id`
+ * lets something higher up the page jump to it; the margin keeps its title
+ * clear of the sticky PageHead.
+ */
+export function Group({ title, actions, hint, children, className, id }: {
+  title: ReactNode; actions?: ReactNode; hint?: ReactNode; children: ReactNode; className?: string; id?: string;
 }) {
   return (
-    <section className={className}>
+    <section id={id} className={cx(id && "scroll-mt-40", className)}>
       <div className="mb-2 flex min-h-10 items-end justify-between gap-3">
         <h2 className={GROUP_TITLE}>{title}</h2>
         {actions && <div className="-mb-1 flex shrink-0 flex-wrap justify-end gap-2">{actions}</div>}
@@ -71,9 +186,9 @@ export function Row({ children, className }: { children: ReactNode; className?: 
 }
 
 /** Label over value, in a responsive grid. Empty values say so instead of vanishing. */
-export function Facts({ children, cols = 3 }: { children: ReactNode; cols?: 2 | 3 | 4 }) {
+export function Facts({ children, cols = 3, className }: { children: ReactNode; cols?: 2 | 3 | 4; className?: string }) {
   const grid = { 2: "sm:grid-cols-2", 3: "sm:grid-cols-2 lg:grid-cols-3", 4: "sm:grid-cols-2 lg:grid-cols-4" }[cols];
-  return <dl className={cx("grid grid-cols-1 gap-x-8 gap-y-4 px-4 py-4", grid)}>{children}</dl>;
+  return <dl className={cx("grid grid-cols-1 gap-x-8 gap-y-4 px-4 py-4", grid, className)}>{children}</dl>;
 }
 
 export function Fact({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {

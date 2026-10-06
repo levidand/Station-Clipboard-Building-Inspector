@@ -1,35 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import L from "leaflet";
 import { get } from "@/lib/api";
 import { formatDay } from "@/lib/format";
 import { BASE, CASE_STATUS, DUE, keys, typeLabel, useSettings } from "@/lib/inspections";
+import { MAP_BASES as BASES, MAP_COLORS as COLORS, type MapBase as Base } from "@/lib/maps";
 import type { MapData } from "@/lib/types";
 import { Checkbox, Segmented } from "@/components/ui";
 import { QueryState } from "@/components/kit";
-
-type Base = "streets" | "aerial";
-const tiles = (service: string) => `https://server.arcgisonline.com/ArcGIS/rest/services/${service}/MapServer/tile/{z}/{y}/{x}`;
-const BASES: Record<Base, { layers: string[]; attribution: string }> = {
-  streets: { layers: [tiles("World_Street_Map")], attribution: 'Powered by <a href="https://www.esri.com">Esri</a> | Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors' },
-  aerial: { layers: [tiles("World_Imagery"), tiles("Reference/World_Transportation")], attribution: 'Powered by <a href="https://www.esri.com">Esri</a> | Esri, Vantor, Earthstar Geographics' },
-};
-
-const COLORS = {
-  overdue: "#c62828", due_soon: "#ff9800", current: "#7cb342", none: "#9e9e9e",
-  hydrant: "#64b5f6", hydrantOut: "#f08080", complaint: "#ffc629", inspection: "#ffffff",
-};
 
 /**
  * The department on one map: every business coloured by when it's due,
  * hydrants from the Command Portal, open complaints and the next two weeks of
  * inspections. Drawn on one canvas, so a department with thousands of hydrants
  * still pans smoothly (the Command Portal learned that the hard way).
+ * Opened with ?focus=<business id> (Show on the map, from a business), it
+ * starts close in on that business with its card open.
  */
 export function MapPage() {
   const settings = useSettings();
   const [, navigate] = useLocation();
+  const focus = Number(new URLSearchParams(useSearch()).get("focus")) || null;
   const q = useQuery({ queryKey: keys.map, queryFn: ({ signal }) => get<MapData>(`${BASE}/map`, signal) });
   const [base, setBase] = useState<Base>("streets");
   const [show, setShow] = useState({ businesses: true, hydrants: true, complaints: true, inspections: true });
@@ -85,17 +77,19 @@ export function MapPage() {
         }).bindPopup(`<b>Hydrant ${esc(h.identifier)}</b><br>${h.flowGpm ? `${h.flowGpm} GPM · ` : ""}class ${esc(h.hydrantClass)}${h.inService ? "" : "<br><b>Out of service</b>"}`).addTo(layer);
       }
     }
+    let focused: L.CircleMarker | null = null;
     if (show.businesses) {
       for (const p of data.properties) {
         if (p.latitude == null || p.longitude == null) continue;
         const ll = L.latLng(p.latitude, p.longitude);
         points.push(ll);
-        L.circleMarker(ll, {
+        const marker = L.circleMarker(ll, {
           renderer, radius: p.onProgram ? 8 : 6, weight: 2, color: "#111", fillOpacity: 0.95, fillColor: COLORS[p.dueState],
         }).bindPopup(
           `${link(`/businesses/${p.preplanId}`, p.name)}<br>${esc(p.address)}<br>${DUE[p.dueState].label}` +
           `${p.nextDueOn && p.onProgram ? `, due ${esc(formatDay(p.nextDueOn))}` : ""}${p.openViolations ? `<br>${p.openViolations} open violation(s)` : ""}`,
         ).addTo(layer);
+        if (p.preplanId === focus) focused = marker;
       }
     }
     if (show.complaints) {
@@ -116,11 +110,16 @@ export function MapPage() {
           .addTo(layer);
       }
     }
+    if (!fitted.current && focused) {
+      m.setView(focused.getLatLng(), 17);
+      focused.openPopup();
+      fitted.current = true;
+    }
     if (!fitted.current && points.length) {
       m.fitBounds(L.latLngBounds(points).pad(0.1), { maxZoom: 16 });
       fitted.current = true;
     }
-  }, [data, show, settings.data]);
+  }, [data, show, settings.data, focus]);
 
   const toggle = (k: keyof typeof show) => (v: boolean) => setShow(s => ({ ...s, [k]: v }));
 
