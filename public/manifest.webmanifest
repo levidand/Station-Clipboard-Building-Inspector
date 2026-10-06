@@ -1,0 +1,14 @@
+{
+  "name": "StationClipboard Inspection Portal",
+  "short_name": "Inspections",
+  "description": "Fire inspections, permits, code enforcement, events and investigations for StationClipboard departments.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d2345",
+  "theme_color": "#0d2345",
+  "icons": [
+    { "src": "/logo-mark.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

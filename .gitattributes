@@ -1,0 +1,4 @@
+* text=auto
+# Windows launchers must keep CRLF line endings to run correctly.
+*.cmd text eol=crlf
+*.png binary

@@ -1,0 +1,42 @@
+{
+  "name": "stationclipboard-inspection-portal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "StationClipboard Inspection Portal — fire marshal, code enforcement and building inspection app backed by the Department Portal API.",
+  "scripts": {
+    "dev": "vite",
+    "dev:demo": "concurrently -k -n api,web \"node server/index.mjs --demo --api-only\" \"vite --mode demo\"",
+    "build": "tsc --noEmit -p . && vite build",
+    "typecheck": "tsc --noEmit -p .",
+    "start": "node server/index.mjs",
+    "start:replit": "PORT=5000 node server/index.mjs",
+    "demo": "node server/index.mjs --demo"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^3.0.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@tanstack/react-query": "^5.90.21",
+    "@types/leaflet": "^1.9.22",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.2.1",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.545.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.1.14",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.5",
+    "wouter": "^3.3.5"
+  },
+  "overrides": {
+    "rollup": "4.63.6"
+  }
+}
