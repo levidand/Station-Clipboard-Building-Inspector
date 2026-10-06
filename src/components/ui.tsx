@@ -189,6 +189,25 @@ export function Toggle({ checked, onChange, label, description }: {
   );
 }
 
+/** The toggle's switch on its own, for a row that turns on and off in place. Says On or Off beside it. */
+export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return (
+    <button
+      type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className="flex h-11 shrink-0 items-center gap-2.5 rounded-sm px-2 focus-visible:outline-3 focus-visible:outline-yellow disabled:opacity-45"
+    >
+      <span className={cx("relative h-5 w-12 rounded-full transition-colors", checked ? "bg-lightgreen" : "bg-lightcoral")}>
+        <span className={cx(
+          "absolute top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_4px_rgb(0_0_0/0.55)] transition-[left]",
+          checked ? "left-[calc(100%-26px)]" : "-left-0.5",
+        )} />
+      </span>
+      <span className="w-8 text-left text-[15px] text-ink-2">{checked ? "On" : "Off"}</span>
+    </button>
+  );
+}
+
 /** Material check box, lightgreen when checked. */
 export function Checkbox({ checked, onChange, children, className, disabled }: {
   checked: boolean; onChange: (v: boolean) => void; children?: ReactNode; className?: string; disabled?: boolean;
