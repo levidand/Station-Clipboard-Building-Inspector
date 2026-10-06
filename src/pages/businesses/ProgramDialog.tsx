@@ -8,6 +8,7 @@ import { Button, Field, Input, Modal, Select, Textarea, Toggle } from "@/compone
 import { NO_PLACE, PlacePicker, type Place } from "@/components/records";
 import { Note } from "@/components/kit";
 import { toast } from "@/components/toast";
+import { useFindLogo } from "./BusinessLogo";
 
 /** The fields of a business's inspection program, shared by Add and Change. */
 interface Program {
@@ -87,12 +88,15 @@ function AddForm({ onClose, onAdded }: { onClose: () => void; onAdded: (preplanI
   const [place, setPlace] = useState<Place>(NO_PLACE);
   const [occupancyType, setOccupancyType] = useState("");
   const [phone, setPhone] = useState("");
+  const [website, setWebsite] = useState("");
+  const [email, setEmail] = useState("");
   const [p, setP] = useState<Program>({
     occupancyClass: "", riskClass: "", frequencyMonths: "", nextDueOn: todayKey(), onProgram: true,
     ownerName: "", ownerPhone: "", ownerEmail: "", ownerMailingAddress: "", businessLicense: "", notes: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const findLogo = useFindLogo();
 
   async function save() {
     if (!name.trim()) { setError("Give the business a name."); return; }
@@ -100,12 +104,15 @@ function AddForm({ onClose, onAdded }: { onClose: () => void; onAdded: (preplanI
     setBusy(true);
     setError(null);
     try {
-      const res = await api<{ preplanId: number }>("POST", `${BASE}/properties`, {
+      const res = await api<{ preplanId: number; lookForLogo?: boolean }>("POST", `${BASE}/properties`, {
         name: name.trim(), address: place.address.trim(), latitude: place.latitude, longitude: place.longitude,
-        occupancyType: occupancyType || null, phone: phone || null, ...programBody(p),
+        occupancyType: occupancyType || null, phone: phone || null, website: website.trim() || null, email: email.trim() || null,
+        ...programBody(p),
       });
       void refresh();
       toast.success(`${name.trim()} added`);
+      // Its logo is looked for while its page opens.
+      if (res.lookForLogo) findLogo.mutate(res.preplanId);
       onClose();
       onAdded(res.preplanId);
     } catch (err) { setError(errorMessage(err)); } finally { setBusy(false); }
@@ -125,6 +132,12 @@ function AddForm({ onClose, onAdded }: { onClose: () => void; onAdded: (preplanI
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="What kind of business" hint="Restaurant, daycare, warehouse…"><Input value={occupancyType} onChange={e => setOccupancyType(e.target.value)} /></Field>
           <Field label="Business phone"><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
+          <Field label="Website" hint="Its logo is found here, so nobody has to upload one.">
+            <Input value={website} onChange={e => setWebsite(e.target.value)} inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="acmeplumbing.com" />
+          </Field>
+          <Field label="Business email" hint="One at its own domain finds the logo too. Gmail, Outlook and the like can't.">
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} autoCapitalize="none" spellCheck={false} />
+          </Field>
         </div>
         <ProgramFields p={p} set={patch => setP(cur => ({ ...cur, ...patch }))} />
         {error && <p role="alert" className="text-[16px] text-lightcoral">{error}</p>}

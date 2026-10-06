@@ -73,6 +73,8 @@ export interface PropertyRow {
   tenancy: string | null; masterPreplanId: number | null; targetHazard: string | null; buildingStatus: string | null;
   hasProgram: boolean; onProgram: boolean; occupancyClass: string | null; riskClass: RiskClass | null;
   nextDueOn: string | null; lastInspectedOn: string | null; dueState: DueState; openViolations: number;
+  /** A storage path ("/objects/inspections/logos/…"): its logo, found on its website. */
+  logoUrl?: string | null;
 }
 
 export interface PreplanContact { name: string; role: string; phone: string; altPhone?: string; email?: string; keyHolder?: boolean }
@@ -84,6 +86,10 @@ export interface PropertyDetail extends PropertyRow {
   effectiveFrequencyMonths: number;
   ownerName: string | null; ownerPhone: string | null; ownerEmail: string | null; ownerMailingAddress: string | null;
   businessLicense: string | null; notes: string | null;
+  /** The business's own website (https://…) and email. The logo comes from the website, or the email's domain. */
+  email?: string | null; website?: string | null;
+  /** The site the logo came from, or was last looked for on. */
+  logoDomain?: string | null;
   preplan: {
     phone: string | null; emergencyContacts: PreplanContact[]; constructionType: string;
     floorsAbove: number | null; floorsBelow: number | null; squareFeet: number | null;

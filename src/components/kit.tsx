@@ -25,9 +25,20 @@ export const PAGE = "w-full space-y-8 px-4 pb-20 sm:px-6";
  * The strip across the top of every page: its name, one short line, and its
  * main buttons. It stays put while the page scrolls (on a tablet or bigger).
  */
-export function PageHead({ title, sub, children, back, badges }: {
+export function PageHead({ title, sub, children, back, badges, lead }: {
   title: ReactNode; sub?: ReactNode; children?: ReactNode; back?: { href: string; label: string }; badges?: ReactNode;
+  /** A picture before the name: a business's logo. */
+  lead?: ReactNode;
 }) {
+  const text = (
+    <>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <h1 className="text-[24px] font-medium leading-8 text-ink">{title}</h1>
+        {badges}
+      </div>
+      {sub && <p className="mt-0.5 text-[15px] leading-6 text-ink-3">{sub}</p>}
+    </>
+  );
   return (
     <header className="z-10 -mx-4 flex min-h-[84px] flex-wrap items-center gap-x-4 gap-y-2.5 border-b border-divider bg-alt px-4 py-3.5 shadow-bar md:sticky md:top-0 sm:-mx-6 sm:px-6">
       <div className="min-w-0 flex-1 basis-72">
@@ -36,11 +47,7 @@ export function PageHead({ title, sub, children, back, badges }: {
             <ArrowLeft className="h-4 w-4" />{back.label}
           </Link>
         )}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h1 className="text-[24px] font-medium leading-8 text-ink">{title}</h1>
-          {badges}
-        </div>
-        {sub && <p className="mt-0.5 text-[15px] leading-6 text-ink-3">{sub}</p>}
+        {lead ? <div className="flex items-center gap-4">{lead}<div className="min-w-0 flex-1">{text}</div></div> : text}
       </div>
       {children && <div className="flex shrink-0 flex-wrap gap-2">{children}</div>}
     </header>

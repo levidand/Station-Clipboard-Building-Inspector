@@ -264,10 +264,50 @@ export function demoRouter() {
   // Businesses -------------------------------------------------------------
   const programOf = (preplanId) => db.programs.find(p => p.preplanId === preplanId);
   const openViolationsAt = (preplanId) => db.violations.filter(v => v.preplanId === preplanId && v.status === "open").length;
+
+  // Website, email and logo (inspection_business_profiles). The real server
+  // reads the business's own website for its icons (lib/siteLogo.ts); the demo
+  // asks Google's favicon service and keeps the picture in memory.
+  const profiles = new Map();
+  const logoFiles = new Map();
+  const PERSONAL_MAIL = /^(gmail|googlemail|outlook|hotmail|live|msn|yahoo|ymail|aol|icloud|me|mac|protonmail|proton|gmx|mail|att|sbcglobal|bellsouth|comcast|verizon|cox|charter|earthlink|juno|frontier|windstream|centurylink)\.[a-z.]+$/;
+  const siteOf = (raw) => {
+    try {
+      const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+      return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(u.hostname) ? `https://${u.hostname.toLowerCase()}${u.pathname.replace(/\/+$/, "")}` : null;
+    } catch { return null; }
+  };
+  const logoDomainOf = (pr) => {
+    if (pr?.website) return new URL(pr.website).hostname.replace(/^www\./, "");
+    const d = pr?.email?.split("@")[1]?.toLowerCase();
+    return d && /\./.test(d) && !PERSONAL_MAIL.test(d) ? d.replace(/^www\./, "") : null;
+  };
+  const badProfile = (b) => (b.website && !siteOf(String(b.website)) ? "That doesn't look like a website. Type it like acmeplumbing.com"
+    : b.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(b.email).trim()) ? "That email address doesn't look right" : null);
+  /** Saves the website and email if the body has them; true when the logo needs looking for. */
+  const saveProfile = (id, b) => {
+    if (b.email === undefined && b.website === undefined) return false;
+    const pr = profiles.get(id) ?? { email: null, website: null, logoUrl: null, logoDomain: null };
+    if (b.email !== undefined) pr.email = clean(b.email);
+    if (b.website !== undefined) pr.website = b.website ? siteOf(String(b.website)) : null;
+    const domain = logoDomainOf(pr);
+    if (!domain) { logoFiles.delete(pr.logoUrl); pr.logoUrl = null; pr.logoDomain = null; }
+    profiles.set(id, pr);
+    return !!domain && domain !== pr.logoDomain;
+  };
+  r.get("/storage/objects/inspections/logos/:id", (req, res) => {
+    const file = logoFiles.get(`/objects/inspections/logos/${req.params.id}`);
+    if (!file) return res.status(404).json({ error: "Object not found" });
+    res.setHeader("Content-Type", file.type);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.end(file.bytes);
+  });
+
   const propertyRow = (p, t) => {
     const prog = programOf(p.id);
     return {
       preplanId: p.id, name: p.name, address: p.address, latitude: p.latitude, longitude: p.longitude, occupancyType: p.occupancyType,
+      logoUrl: profiles.get(p.id)?.logoUrl ?? null,
       preplanNumber: p.preplanNumber, firstDueStation: p.firstDueStation, tenancy: p.tenancy, masterPreplanId: p.masterPreplanId,
       targetHazard: null, buildingStatus: "occupied", hasProgram: !!prog, onProgram: prog?.onProgram ?? false,
       occupancyClass: prog?.occupancyClass ?? null, riskClass: prog?.riskClass ?? null, nextDueOn: prog?.nextDueOn ?? null,
@@ -290,6 +330,7 @@ export function demoRouter() {
     const prog = programOf(p.id);
     res.json({
       ...propertyRow(p, t), today: t,
+      email: profiles.get(p.id)?.email ?? null, website: profiles.get(p.id)?.website ?? null, logoDomain: profiles.get(p.id)?.logoDomain ?? null,
       frequencyMonths: prog?.frequencyMonths ?? null, effectiveFrequencyMonths: freqFor(prog),
       ownerName: prog?.ownerName ?? null, ownerPhone: prog?.ownerPhone ?? null, ownerEmail: prog?.ownerEmail ?? null,
       ownerMailingAddress: prog?.ownerMailingAddress ?? null, businessLicense: prog?.businessLicense ?? null, notes: prog?.notes ?? null,
@@ -307,17 +348,19 @@ export function demoRouter() {
   ip.post("/properties", WRITE.inspect, (req, res) => {
     const b = req.body ?? {};
     if (!clean(b.name) || !clean(b.address)) return res.status(400).json({ error: "Give the business a name and an address." });
+    if (badProfile(b)) return res.status(400).json({ error: badProfile(b) });
     const p = newPreplan(nextId(), { name: clean(b.name), address: clean(b.address), latitude: b.latitude ?? null, longitude: b.longitude ?? null, occupancyType: clean(b.occupancyType), phone: clean(b.phone) });
     db.preplans.push(p);
     const prog = { preplanId: p.id, onProgram: true, ...pickProgram(b) };
     if (prog.onProgram !== false && !prog.nextDueOn) prog.nextDueOn = today();
     db.programs.push(prog);
-    res.status(201).json({ preplanId: p.id });
+    res.status(201).json({ preplanId: p.id, lookForLogo: saveProfile(p.id, b) });
   });
   ip.patch("/properties/:id", WRITE.inspect, (req, res) => {
     const p = byId(db.preplans, req.params.id);
     if (!p) return res.status(404).json({ error: "Business not found" });
     const b = req.body ?? {};
+    if (badProfile(b)) return res.status(400).json({ error: badProfile(b) });
     for (const k of ["name", "address", "latitude", "longitude", "occupancyType", "phone"]) if (b[k] !== undefined) p[k] = b[k];
     const patch = pickProgram(b);
     if (Object.keys(patch).length) {
@@ -328,6 +371,30 @@ export function demoRouter() {
       if (b.nextDueOn === undefined && (patch.riskClass !== undefined || patch.frequencyMonths !== undefined) && prog.lastInspectedOn) prog.nextDueOn = addMonths(prog.lastInspectedOn, freqFor(prog));
       if (!wasOn && prog.onProgram && !prog.nextDueOn && !prog.lastInspectedOn) prog.nextDueOn = today();
     }
+    res.json({ ok: true, lookForLogo: saveProfile(p.id, b) });
+  });
+  ip.post("/properties/:id/logo", WRITE.inspect, async (req, res) => {
+    const pr = profiles.get(Number(req.params.id));
+    const domain = logoDomainOf(pr);
+    if (!domain) return res.status(400).json({ error: "Add the business's website, or an email address at its own domain, and the logo comes from that." });
+    let file = null;
+    try {
+      const got = await fetch(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`, { signal: AbortSignal.timeout(8000) });
+      if (got.ok) file = { type: got.headers.get("content-type") || "image/png", bytes: Buffer.from(await got.arrayBuffer()) };
+    } catch { /* offline: nothing found */ }
+    if (!file) {
+      if (pr.logoDomain !== domain) { logoFiles.delete(pr.logoUrl); pr.logoUrl = null; pr.logoDomain = domain; }
+      return res.json({ found: false, domain, logoUrl: pr.logoUrl });
+    }
+    const key = `/objects/inspections/logos/${crypto.randomUUID()}`;
+    logoFiles.set(key, file);
+    logoFiles.delete(pr.logoUrl);
+    Object.assign(pr, { logoUrl: key, logoDomain: domain });
+    res.json({ found: true, domain, logoUrl: key });
+  });
+  ip.delete("/properties/:id/logo", WRITE.inspect, (req, res) => {
+    const pr = profiles.get(Number(req.params.id));
+    if (pr?.logoUrl) { logoFiles.delete(pr.logoUrl); pr.logoUrl = null; }
     res.json({ ok: true });
   });
 

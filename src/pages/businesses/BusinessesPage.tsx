@@ -10,6 +10,7 @@ import type { DueState, Listed, PropertyRow } from "@/lib/types";
 import { Badge, Button, TONE_EDGE } from "@/components/ui";
 import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
 import { AddBusinessDialog } from "./ProgramDialog";
+import { BusinessLogo } from "./BusinessLogo";
 
 type Filter = "all" | "overdue" | "due_soon" | "program" | "none";
 const ORDER: Record<DueState, number> = { overdue: 0, due_soon: 1, current: 2, none: 3 };
@@ -66,6 +67,7 @@ export function BusinessesPage() {
               {rows.slice(0, shown).map(r => (
                 <ListRow
                   key={r.preplanId} href={`/businesses/${r.preplanId}`}
+                  lead={<BusinessLogo name={r.name} logoUrl={r.logoUrl} />}
                   edge={r.dueState === "overdue" ? TONE_EDGE.danger : r.dueState === "due_soon" ? TONE_EDGE.warn : undefined}
                   title={r.name}
                   tags={<>

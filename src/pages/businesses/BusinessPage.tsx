@@ -1,12 +1,12 @@
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   AlertTriangle, BadgeCheck, Ban, BellRing, CalendarCog, CheckCircle2, ClipboardCheck, ClipboardPlus, Copy, Cylinder, Droplets,
-  ExternalLink, Footprints, Gauge, Gavel, KeyRound, Mail, Map as MapIcon, Megaphone, Navigation, Pencil, Phone, Plug, Printer,
-  Repeat, Stamp,
+  ExternalLink, Footprints, Gauge, Gavel, Globe, ImageOff, KeyRound, Mail, Map as MapIcon, Megaphone, Navigation, Pencil, Phone, Plug,
+  Printer, RefreshCw, Repeat, Stamp,
 } from "lucide-react";
-import { get } from "@/lib/api";
+import { api, errorMessage, get } from "@/lib/api";
 import { usePermissions } from "@/lib/auth";
 import { dayOf, formatDay, plural, relativeDay } from "@/lib/format";
 import {
@@ -20,6 +20,7 @@ import { ActionMenu, Box, Fact, Facts, Group, ListRow, Note, PAGE, PageHead, Que
 import { InspectionListRow, PREPLANS_URL, PreplanLink, ScheduleDialog, ViolationLine } from "@/components/records";
 import { toast } from "@/components/toast";
 import { ProgramDialog } from "./ProgramDialog";
+import { BusinessLogo, LOGO_LOOKUP, WebsiteDialog, siteLabel, useFindLogo } from "./BusinessLogo";
 
 const MiniMap = lazy(() => import("./MiniMap"));
 
@@ -53,10 +54,13 @@ export function BusinessPage({ id }: { id: number }) {
   const nearby = useMemo(() => nearestHydrants(d, map.data?.hydrants), [d, map.data]);
   // Nearest first: the mini map frames itself on the first three.
   const onMap = useMemo(() => nearby.filter((n, i) => i < 3 || n.feet <= 2000).slice(0, 12).map(n => n.h), [nearby]);
-  const [dialog, setDialog] = useState<null | "schedule" | "program">(null);
+  const [dialog, setDialog] = useState<null | "schedule" | "program" | "website">(null);
   const [showClosed, setShowClosed] = useState(false);
   const [allPast, setAllPast] = useState(false);
   const [allHistory, setAllHistory] = useState(false);
+  const findLogo = useFindLogo();
+  // Also true when the lookup started from "Add a business", before this page opened.
+  const lookingForLogo = useIsMutating({ mutationKey: LOGO_LOOKUP, predicate: m => m.state.variables === id }) > 0;
 
   if (!d) return <div className={PAGE}><QueryState query={q}>{null}</QueryState></div>;
 
@@ -90,6 +94,13 @@ export function BusinessPage({ id }: { id: number }) {
     try { await navigator.clipboard.writeText(d!.address); toast.success("Address copied"); }
     catch { toast.error("Couldn't copy it here. Press and hold the address to copy it."); }
   }
+  async function removeLogo() {
+    try {
+      await api("DELETE", `${BASE}/properties/${id}/logo`);
+      toast.success("Logo removed");
+      void qc.invalidateQueries({ queryKey: [BASE] });
+    } catch (err) { toast.error(errorMessage(err)); }
+  }
 
   const heads = [
     d.notes ? { label: "Notes for inspectors", body: d.notes } : null,
@@ -101,6 +112,7 @@ export function BusinessPage({ id }: { id: number }) {
     <div className={PAGE}>
       <PageHead
         back={{ href: "/businesses", label: "Businesses" }}
+        lead={<BusinessLogo name={d.name} logoUrl={d.logoUrl} size="lg" looking={lookingForLogo} />}
         title={d.name}
         sub={[d.address, d.occupancyType, d.preplanNumber].filter(Boolean).join(" · ")}
         badges={<>
@@ -120,6 +132,15 @@ export function BusinessPage({ id }: { id: number }) {
               label: d.hasProgram ? "Change the inspection program" : "Put it on the inspection program", icon: CalendarCog,
               hint: "Risk, how often it's inspected, the owner and where notices go.", onClick: () => setDialog("program"),
             },
+            perms.inspect && {
+              label: d.website || d.email ? "Change the website or email" : "Add the website or email", icon: Globe,
+              hint: "The logo is found on the website, so nobody has to upload one.", onClick: () => setDialog("website"),
+            },
+            perms.inspect && !!(d.website || d.email) && !lookingForLogo && {
+              label: d.logoUrl ? "Look for a newer logo" : "Look for the logo", icon: RefreshCw,
+              hint: `Reads ${d.website ? siteLabel(d.website) : "the email's website"} again for it.`, onClick: () => findLogo.mutate(id),
+            },
+            perms.inspect && !!d.logoUrl && { label: "Remove the logo", icon: ImageOff, hint: "Shows the business's initials instead.", onClick: () => void removeLogo() },
             { label: "Print the business record", icon: Printer, hint: "The program, open violations and every inspection, on paper.", onClick: () => navigate(`/businesses/${id}/print`) },
             located && { label: "Show on the map", icon: MapIcon, hint: "With the hydrants and the businesses round it.", onClick: () => navigate(`/map?focus=${id}`) },
             { label: "Get directions", icon: Navigation, hint: "Opens Google Maps.", href: directionsUrl(d) },
@@ -282,7 +303,7 @@ export function BusinessPage({ id }: { id: number }) {
 
           <Group id="contacts" title="Who to call">
             <Box>
-              <Contact name="The business" role={null} phone={pp.phone} />
+              <Contact name="The business" role={null} phone={pp.phone} email={d.email} website={d.website} />
               <Contact name={d.ownerName ?? "Owner not recorded"} role="Owner" phone={d.ownerPhone} email={d.ownerEmail}
                 more={d.ownerMailingAddress ? `Notices go to ${d.ownerMailingAddress}` : d.hasProgram ? "Notices go to the business itself" : null} />
               {pp.emergencyContacts.map((c, i) => (
@@ -379,6 +400,10 @@ export function BusinessPage({ id }: { id: number }) {
 
       <ScheduleDialog open={dialog === "schedule"} onClose={() => setDialog(null)} preset={{ place, discipline: "fire", context: d.name }} />
       <ProgramDialog open={dialog === "program"} onClose={() => setDialog(null)} d={d} onSaved={() => { void qc.invalidateQueries({ queryKey: [BASE] }); }} />
+      <WebsiteDialog open={dialog === "website"} onClose={() => setDialog(null)} d={d} onSaved={look => {
+        void qc.invalidateQueries({ queryKey: [BASE] });
+        if (look) findLogo.mutate(id);
+      }} />
     </div>
   );
 }
@@ -439,8 +464,9 @@ function ViolationLink({ v, times }: { v: Violation; times: number }) {
   );
 }
 
-function Contact({ name, role, phone, altPhone, email, more, tag }: {
-  name: string; role: string | null; phone?: string | null; altPhone?: string; email?: string | null; more?: string | null; tag?: ReactNode;
+function Contact({ name, role, phone, altPhone, email, website, more, tag }: {
+  name: string; role: string | null; phone?: string | null; altPhone?: string; email?: string | null; website?: string | null;
+  more?: string | null; tag?: ReactNode;
 }) {
   const link = "inline-flex min-h-11 items-center gap-2 text-[17px] text-sky hover:underline";
   return (
@@ -450,11 +476,12 @@ function Contact({ name, role, phone, altPhone, email, more, tag }: {
         {role && <span className="text-[15px] text-ink-3">{role}</span>}
         {tag}
       </div>
-      {phone || altPhone || email ? (
+      {phone || altPhone || email || website ? (
         <div className="flex flex-col items-start">
           {phone && <a href={`tel:${phone}`} className={link}><Phone className="h-5 w-5" />{phone}</a>}
           {altPhone && <a href={`tel:${altPhone}`} className={link}><Phone className="h-5 w-5" />{altPhone}</a>}
           {email && <a href={`mailto:${email}`} className={cx(link, "break-all")}><Mail className="h-5 w-5 shrink-0" />{email}</a>}
+          {website && <a href={website} target="_blank" rel="noopener noreferrer" className={cx(link, "break-all")}><Globe className="h-5 w-5 shrink-0" />{siteLabel(website)}</a>}
         </div>
       ) : <div className="py-1 text-[15px] text-ink-4">No phone recorded</div>}
       {more && <div className="text-[15px] leading-6 text-ink-3">{more}</div>}
