@@ -7,12 +7,19 @@ import { usePermissions } from "@/lib/auth";
 import { daysBetween, formatDay } from "@/lib/format";
 import { BASE, PERMIT_CATEGORY, PERMIT_STATUS, keys, typeLabel, useSettings } from "@/lib/inspections";
 import type { Listed, PermitCategory, PermitRow } from "@/lib/types";
-import { Badge, Button, Segmented, Select, TONE_EDGE } from "@/components/ui";
-import { Box, EmptyBox, Group, ListRow, PAGE, PageHead, QueryState, SearchBox, Toolbar } from "@/components/kit";
+import { Badge, Button, TONE_EDGE } from "@/components/ui";
+import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
 import { usePlaceOf } from "@/components/records";
 import { NewPermitDialog } from "./PermitDialogs";
 
 type Filter = "waiting" | "active" | "expiring" | "closed" | "all";
+const STATUS_OPTIONS: { value: Filter; label: string }[] = [
+  { value: "waiting", label: "Waiting on us" }, { value: "active", label: "Issued" }, { value: "expiring", label: "Expiring soon" },
+  { value: "closed", label: "Closed" }, { value: "all", label: "All" },
+];
+const GROUP_TITLE: Record<Filter, string> = {
+  waiting: "Waiting on us", active: "Issued", expiring: "Expiring soon", closed: "Closed permits", all: "All permits",
+};
 
 export function PermitsPage() {
   const perms = usePermissions();
@@ -44,24 +51,19 @@ export function PermitsPage() {
         {perms.permits && <Button variant="primary" size="lg" onClick={() => setAdding(true)}><Plus className="h-5 w-5" />Take an application</Button>}
       </PageHead>
 
-      <Toolbar>
-        <Segmented value={filter} onChange={setFilter} options={[
-          { value: "waiting", label: "Waiting on us" }, { value: "active", label: "Issued", tone: "ok" },
-          { value: "expiring", label: "Expiring soon", tone: "warn" }, { value: "closed", label: "Closed", tone: "muted" },
-          { value: "all", label: "All" },
-        ]} />
-        <Select value={category} onChange={e => setCategory(e.target.value as PermitCategory | "")} className="w-auto min-w-48" aria-label="Kind of permit">
-          <option value="">All kinds</option>
-          {(Object.keys(PERMIT_CATEGORY) as PermitCategory[]).map(c => <option key={c} value={c}>{PERMIT_CATEGORY[c]}</option>)}
-        </Select>
-        <SearchBox value={q} onChange={setQ} placeholder="Number, address, applicant" />
-      </Toolbar>
+      <FilterBar search={{ value: q, onChange: setQ, placeholder: "Number, address, applicant" }} filters={[
+        { label: "Status", value: filter, empty: "waiting", onChange: setFilter, options: STATUS_OPTIONS },
+        { label: "Kind", value: category, empty: "", onChange: setCategory, options: [
+          { value: "", label: "All kinds" },
+          ...(Object.keys(PERMIT_CATEGORY) as PermitCategory[]).map(c => ({ value: c, label: PERMIT_CATEGORY[c] })),
+        ] },
+      ]} />
 
       <QueryState query={list}>
         {rows.length === 0 ? (
           <EmptyBox title="No permits here">{filter === "waiting" && perms.permits ? "New applications go in with the button at the top." : null}</EmptyBox>
         ) : (
-          <Group title={`${rows.length} permit${rows.length === 1 ? "" : "s"}`}>
+          <Group title={`${GROUP_TITLE[filter]} (${rows.length})`}>
             <Box>
               {rows.map(p => {
                 const waiting = ["applied", "in_review", "corrections", "approved"].includes(p.status);

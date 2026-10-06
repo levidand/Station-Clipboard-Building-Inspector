@@ -136,7 +136,7 @@ function NavList({ items, location, counts, big }: {
 function PortalLinks() {
   return (
     <div className="mt-auto border-t border-divider py-2">
-      <a href={DEPARTMENT_PORTAL_URL} target="_blank" rel="noopener" className="flex h-12 items-center gap-4 px-5 text-[15px] text-ink-3 hover:bg-white/[.05] hover:text-white">
+      <a href={departmentPortalHref()} target={DEPARTMENT_PORTAL_WINDOW} className="flex h-12 items-center gap-4 px-5 text-[15px] text-ink-3 hover:bg-white/[.05] hover:text-white">
         <ExternalLink className="h-5 w-5 shrink-0" />Department Portal
       </a>
       <a href={COMMAND_PORTAL_URL} target="_blank" rel="noopener" className="flex h-12 items-center gap-4 px-5 text-[15px] text-ink-3 hover:bg-white/[.05] hover:text-white">
@@ -146,20 +146,29 @@ function PortalLinks() {
   );
 }
 
-/** One box that finds a business, an inspection, a permit, a complaint or an event by name, number or address. */
+/**
+ * One box that finds a business, an inspection, a permit, a complaint or an
+ * event by name, number or address. A phone has no room for it beside the
+ * title bar's buttons, so there it's a button that opens the box over the bar.
+ */
 function GlobalSearch() {
   const [, navigate] = useLocation();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  /** On a phone: the box has taken over the title bar. */
+  const [wide, setWide] = useState(false);
   const [debounced, setDebounced] = useState("");
   const box = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const close = () => { setOpen(false); setWide(false); };
   useEffect(() => { const t = setTimeout(() => setDebounced(q.trim()), 250); return () => clearTimeout(t); }, [q]);
+  useEffect(() => { if (wide) input.current?.focus(); }, [wide]);
   useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    if (!open && !wide) return;
+    const h = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) close(); };
     window.addEventListener("mousedown", h);
     return () => window.removeEventListener("mousedown", h);
-  }, [open]);
+  }, [open, wide]);
   const search = useQuery({
     queryKey: [BASE, "search", debounced],
     queryFn: ({ signal }) => get<SearchResults>(`${BASE}/search?q=${encodeURIComponent(debounced)}`, signal),
@@ -176,74 +185,53 @@ function GlobalSearch() {
     { title: "Investigations", rows: r.investigations.map(v => ({ href: `/investigations/${v.id}`, title: `${v.number} · ${v.title}`, detail: v.address })) },
   ].filter(g => g.rows.length) : [];
 
-  const go = (href: string) => { setOpen(false); setQ(""); navigate(href); };
+  const go = (href: string) => { close(); setQ(""); navigate(href); };
 
   return (
-    <div ref={box} className="relative w-full max-w-xl">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-3" />
-      <Input
-        value={q} onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
-        onKeyDown={e => { if (e.key === "Escape") setOpen(false); if (e.key === "Enter" && groups[0]?.rows[0]) go(groups[0].rows[0].href); }}
-        placeholder="Find a business, address or number" aria-label="Search"
-        className="h-11 border-white/30 bg-white/10 pl-10 text-[16px]"
-      />
-      {open && debounced.length >= 2 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-sm border border-divider bg-surface py-1 text-ink shadow-float">
-          {search.isLoading ? <p className="px-4 py-3 text-[15px] text-ink-3">Searching…</p>
-            : groups.length === 0 ? <p className="px-4 py-3 text-[15px] text-ink-3">Nothing matches “{debounced}”.</p>
-            : groups.map(g => (
-              <div key={g.title}>
-                <div className="px-4 pb-1 pt-2.5 text-[13px] font-medium uppercase tracking-[0.06em] text-ink-3">{g.title}</div>
-                {g.rows.map(row => (
-                  <button key={row.href} type="button" onClick={() => go(row.href)} className="block w-full px-4 py-2.5 text-left hover:bg-hover">
-                    <span className="block text-[16px] text-ink">{row.title}</span>
-                    <span className="block text-[14px] text-ink-3">{row.detail}</span>
-                  </button>
-                ))}
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function UserMenu() {
-  const { session, logout } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [avatarFailed, setAvatarFailed] = useState<string | null>(null);
-  if (!session) return null;
-  const name = `${session.firstName} ${session.lastName}`;
-  const avatar = storageUrl(session.avatarUrl);
-  return (
-    <div className="relative shrink-0">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2.5 rounded-sm py-1.5 pl-1.5 pr-2 text-white transition-colors hover:bg-white/[.075]"
-        aria-expanded={open} aria-haspopup="menu" aria-label="Your account"
+    <>
+      <IconButton label="Search" onClick={() => setWide(true)} className="ml-auto text-ink-2 hover:text-white sm:hidden">
+        <Search className="h-6 w-6" />
+      </IconButton>
+      <div
+        ref={box}
+        className={cx(
+          "relative w-full max-w-xl",
+          wide ? "fixed inset-x-0 top-0 z-40 flex h-14 max-w-none items-center gap-1 bg-navy px-2 shadow-bar" : "hidden sm:block",
+        )}
       >
-        {avatar && avatarFailed !== avatar
-          ? <img src={avatar} alt="" onError={() => setAvatarFailed(avatar)} className="h-10 w-10 rounded-full object-cover" />
-          : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue text-[15px] font-medium text-white">{initials(name)}</span>}
-        <span className="hidden text-left leading-tight md:block">
-          <span className="block text-[15px] font-medium">{name}</span>
-          <span className="block text-[13px] text-ink-3">{session.orgName}</span>
-        </span>
-        <ChevronDown className={cx("h-5 w-5 text-ink-3 transition-transform", open && "rotate-180")} />
-      </button>
-      <Menu open={open} onClose={() => setOpen(false)}>
-        <div className="mb-2 border-b border-divider px-4 pb-3 pt-1">
-          <div className="text-[16px] font-medium">{name}</div>
-          <div className="text-[14px] text-ink-3">@{session.username} · {session.orgSlug}</div>
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-3" />
+          <Input
+            ref={input}
+            value={q} onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+            onKeyDown={e => { if (e.key === "Escape") close(); if (e.key === "Enter" && groups[0]?.rows[0]) go(groups[0].rows[0].href); }}
+            placeholder="Find a business, address or number" aria-label="Search"
+            className="h-11 border-white/30 bg-white/10 pl-10 text-[16px]"
+          />
         </div>
-        <MenuLink icon={ExternalLink} href={DEPARTMENT_PORTAL_URL} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
-          Department Portal
-        </MenuLink>
-        <MenuLink icon={Siren} href={COMMAND_PORTAL_URL} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
-          Command Portal
-        </MenuLink>
-        <MenuItem icon={LogOut} onClick={() => { setOpen(false); void logout(); }}>Sign out</MenuItem>
-      </Menu>
-    </div>
+        {wide && (
+          <IconButton label="Close search" onClick={close} className="text-white hover:text-white">
+            <X className="h-6 w-6" />
+          </IconButton>
+        )}
+        {open && debounced.length >= 2 && (
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-sm border border-divider bg-surface py-1 text-ink shadow-float">
+            {search.isLoading ? <p className="px-4 py-3 text-[15px] text-ink-3">Searching…</p>
+              : groups.length === 0 ? <p className="px-4 py-3 text-[15px] text-ink-3">Nothing matches “{debounced}”.</p>
+              : groups.map(g => (
+                <div key={g.title}>
+                  <div className="px-4 pb-1 pt-2.5 text-[13px] font-medium uppercase tracking-[0.06em] text-ink-3">{g.title}</div>
+                  {g.rows.map(row => (
+                    <button key={row.href} type="button" onClick={() => go(row.href)} className="block w-full px-4 py-2.5 text-left hover:bg-hover">
+                      <span className="block text-[16px] text-ink">{row.title}</span>
+                      <span className="block text-[14px] text-ink-3">{row.detail}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

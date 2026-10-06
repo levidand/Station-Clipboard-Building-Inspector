@@ -7,8 +7,8 @@ import { useAuth } from "@/lib/auth";
 import { dateTime, fromLocalInput, toLocalInput } from "@/lib/format";
 import { BASE, CAUSE_CLASS, INVESTIGATION_STATUS, keys, useRefreshAll } from "@/lib/inspections";
 import type { CommandIncident, InvestigationDetail, InvestigationRow } from "@/lib/types";
-import { Badge, Button, Field, Input, Modal, Segmented, Select } from "@/components/ui";
-import { Box, EmptyBox, Group, ListRow, PAGE, PageHead, QueryState, SearchBox, Toolbar } from "@/components/kit";
+import { Badge, Button, Field, Input, Modal, Select } from "@/components/ui";
+import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
 import { NO_PLACE, PersonSelect, PlacePicker, type Place } from "@/components/records";
 import { toast } from "@/components/toast";
 
@@ -34,13 +34,14 @@ export function InvestigationsPage() {
         <Lock className="h-5 w-5 shrink-0 text-orange" />
         Confidential. Witnesses, suspects and evidence are recorded here; don't share what's on these pages outside the investigation.
       </div>
-      <Toolbar>
-        <Segmented value={status} onChange={setStatus} options={[{ value: "open", label: "Open" }, { value: "closed", label: "Closed" }, { value: "all", label: "All" }]} />
-        <SearchBox value={q} onChange={setQ} placeholder="Number, title, address or incident number" />
-      </Toolbar>
+      <FilterBar search={{ value: q, onChange: setQ, placeholder: "Number, title, address or incident number" }} filters={[
+        { label: "Status", value: status, empty: "open", onChange: setStatus, options: [
+          { value: "open", label: "Open" }, { value: "closed", label: "Closed" }, { value: "all", label: "All" },
+        ] },
+      ]} />
       <QueryState query={list}>
         {rows.length === 0 ? <EmptyBox title={status === "open" ? "No open investigations" : "Nothing here"} /> : (
-          <Group title={`${rows.length} investigation${rows.length === 1 ? "" : "s"}`}>
+          <Group title={`${status === "open" ? "Open" : status === "closed" ? "Closed" : "All"} investigations (${rows.length})`}>
             <Box>
               {rows.map(r => (
                 <ListRow key={r.id} href={`/investigations/${r.id}`} title={r.title}

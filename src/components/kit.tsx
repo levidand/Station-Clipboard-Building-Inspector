@@ -186,13 +186,12 @@ export function SearchBox({ value, onChange, placeholder, className }: {
  * One filter in a FilterBar's panel. `empty` is the page's usual view: Reset
  * goes back to it, and only a value other than it shows as a chip.
  */
-export interface FilterDef {
+export interface FilterDef<T extends string = string> {
   label: string;
-  value: string;
-  empty: string;
-  options: { value: string; label: string }[];
-  // Method syntax on purpose: it lets a page hand over the setter for its own union type.
-  onChange(value: string): void;
+  value: T;
+  empty: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
 }
 
 /**
@@ -203,7 +202,9 @@ export interface FilterDef {
  */
 export function FilterBar({ search, filters }: {
   search: { value: string; onChange: (v: string) => void; placeholder: string };
-  filters: FilterDef[];
+  // Each filter has its own set of values, so a page can pass its state setters straight in.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filters: FilterDef<any>[];
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);

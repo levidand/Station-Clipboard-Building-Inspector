@@ -59,6 +59,55 @@ const ROLES = {
   code: { name: "Code Enforcement Officer", permissions: ["view", "manage_cases", "conduct_inspections"] },
 };
 
+// Grants in the department's other modules, which decide the apps a demo user
+// is offered. Everyone keeps their own time and schedule; the fire marshal (a
+// super admin, who holds every grant) also runs personnel and the department.
+const DEMO_OTHER_PERMISSIONS = [
+  "clock-in:view_own_entries", "scheduling:view", "scheduling:view_own_schedule", "checklists:view", "checklists:perform_checks",
+  "training:view_assigned", "policies:view_assigned", "chat:view", "incident-command:view",
+];
+const DEMO_CHIEF_PERMISSIONS = [
+  ...DEMO_OTHER_PERMISSIONS, "assets:view_tables", "neris:view_all_reports", "scheduling:view_all_schedules", "core:users.view",
+];
+
+/** [slug, name, enabled], in the Department Portal's registry order. */
+const DEMO_MODULES = [
+  ["core", "Core", true], ["clock-in", "Time Clock", true], ["credits", "Credits", false], ["integrations", "Integrations", false],
+  ["station-board", "Station Board", false], ["scheduling", "Scheduling", true], ["neris", "NERIS Reporting", true],
+  ["assets", "Assets", true], ["checklists", "Checklists", true], ["policies", "Resources", true], ["training", "Training", true],
+  ["incident-command", "Incident Command", true], ["inspections", "Inspections", true], ["chat", "Chat", true],
+];
+
+function demoNotifications() {
+  const ago = (mins) => iso(Date.now() - mins * 60_000);
+  const note = (id, mins, f) => ({
+    id, type: "announcement", title: "", body: "", linkPath: null, priority: "normal", actionRequired: false,
+    actorName: null, silenced: false, isRead: false, readAt: null, createdAt: ago(mins), ...f,
+  });
+  return [
+    note(6, 6, {
+      type: "inspections", title: "New complaint assigned to you",
+      body: "Blocked exit reported at the back of Riverbend Pizza Kitchen. Due for a first visit tomorrow.",
+      linkPath: "/modules/inspections/complaints", priority: "important", actionRequired: true, actorName: "Dana Brooks",
+    }),
+    note(5, 42, {
+      type: "inspections", title: "Permit application waiting for review",
+      body: "Tent permit for the Fall Festival and Fireworks needs plan review.", linkPath: "/modules/inspections/permits", actorName: "Sam Ortiz",
+    }),
+    note(4, 95, {
+      title: "Hydrant flushing this week",
+      body: "Public works is flushing hydrants in District 2 Tuesday through Thursday. Expect low pressure and discolored water on the east side.",
+      actorName: "Chief Alex Rivera",
+    }),
+    note(3, 60 * 5, {
+      type: "scheduling", title: "Shift trade approved",
+      body: "Your trade with Jordan Lee for Saturday was approved.", linkPath: "/modules/scheduling/my-requests", actorName: "Casey Morgan",
+    }),
+    note(2, 60 * 26, { type: "policy", title: "New SOP: Fire watch requirements", body: "Read and acknowledge by Friday.", linkPath: "/modules/policies/my", isRead: true, readAt: ago(60 * 20) }),
+    note(1, 60 * 72, { type: "chat_mention", title: "Jordan Lee mentioned you in #fire-marshal", body: "@Alex can you cover the re-inspection on Main St?", linkPath: "/modules/chat", isRead: true, readAt: ago(60 * 70) }),
+  ];
+}
+
 const PEOPLE = [
   { id: 1, firstName: "Alex", lastName: "Rivera", roles: ["inspects", "enforces", "investigates"] },
   { id: 2, firstName: "Dana", lastName: "Brooks", roles: ["inspects"] },
@@ -98,7 +147,8 @@ export function demoRouter() {
       id: 1, username: String(username), firstName: "Alex", lastName: "Rivera", email: "demo@example.com", avatarUrl: null,
       isSiteAdmin: false, orgId: 1, orgSlug: "demo", orgName: "Demo Fire Department", timezone: TZ, use24HourTime: false,
       logoUrl: null, roles: [], roleName: role?.name ?? "Fire Marshal", isSuperAdmin: !role,
-      permissions: (role?.permissions ?? []).map(p => `inspections:${p}`),
+      permissions: [...(role?.permissions ?? []).map(p => `inspections:${p}`), ...(role ? DEMO_OTHER_PERMISSIONS : DEMO_CHIEF_PERMISSIONS)],
+      branding: { moduleColors: {} },
     };
     sessions.set(token, user);
     res.setHeader("Set-Cookie", `ip_demo=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
@@ -117,6 +167,33 @@ export function demoRouter() {
     if (req.body?.version !== TERMS.version) return res.status(409).json({ error: "The Terms of Service were updated. Read the current version, then accept it.", code: "TERMS_VERSION_CHANGED", ...TERMS });
     accepted.set(req.user.username.toLowerCase(), iso(Date.now()));
     res.json(termsStatus(req.user));
+  });
+
+  // ── The Department Portal's top bar: apps, chat, notifications ───────────
+  // Mirrors routes/modules.ts, routes/notifications.ts and GET /chat/unread
+  // there. Every demo user shares one feed, kept until the server restarts.
+  const org = (req, res, next) => (Number(req.params.orgId) === req.user.orgId ? next() : res.status(403).json({ error: "Access denied" }));
+  r.get("/organizations/:orgId/modules", auth, org, (_req, res) => {
+    res.json(DEMO_MODULES.map(([slug, name, enabled]) => ({ slug, name, enabled, accessGranted: true, required: slug === "core" })));
+  });
+  let notes = demoNotifications();
+  const feed = () => ({ items: notes.slice(0, 40), unreadCount: notes.filter(n => !n.isRead).length });
+  const read = (n) => { if (!n.isRead) Object.assign(n, { isRead: true, readAt: iso(Date.now()) }); };
+  const N = "/organizations/:orgId/notifications";
+  r.get(N, auth, org, (_req, res) => res.json(feed()));
+  r.post(`${N}/read-all`, auth, org, (_req, res) => { notes.forEach(read); res.json(feed()); });
+  r.post(`${N}/mark-read`, auth, org, (req, res) => {
+    const ids = new Set(Array.isArray(req.body?.ids) ? req.body.ids.map(Number) : []);
+    const hit = notes.filter(n => ids.has(n.id) && !n.isRead);
+    hit.forEach(read);
+    res.json({ updated: hit.length });
+  });
+  r.post(`${N}/:id/read`, auth, org, (req, res) => { notes.filter(n => n.id === Number(req.params.id)).forEach(read); res.json(feed()); });
+  r.delete(N, auth, org, (_req, res) => { notes = []; res.json(feed()); });
+  r.delete(`${N}/:id`, auth, org, (req, res) => { notes = notes.filter(n => n.id !== Number(req.params.id)); res.json(feed()); });
+  r.get("/chat/unread", auth, (req, res) => {
+    if (!req.user.permissions.includes("chat:view")) return res.status(403).json({ error: "Forbidden" });
+    res.json({ total: 3, mentions: 1, channels: [] });
   });
 
   // ── Inspections ─────────────────────────────────────────────────────────

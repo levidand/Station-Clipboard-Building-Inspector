@@ -6,8 +6,8 @@ import { api, errorMessage, get } from "@/lib/api";
 import { usePermissions } from "@/lib/auth";
 import { BASE, keys, useRefreshAll } from "@/lib/inspections";
 import type { Listed, Violation, ViolationStatus } from "@/lib/types";
-import { Button, Field, Menu, MenuItem, Segmented, Textarea } from "@/components/ui";
-import { Box, Confirm, EmptyBox, Group, PAGE, PageHead, QueryState, SearchBox, Toolbar } from "@/components/kit";
+import { Button, Field, Menu, MenuItem, Textarea } from "@/components/ui";
+import { Box, Confirm, EmptyBox, FilterBar, Group, PAGE, PageHead, QueryState } from "@/components/kit";
 import { ViolationLine } from "@/components/records";
 import { toast } from "@/components/toast";
 
@@ -38,14 +38,12 @@ export function ViolationsPage() {
   return (
     <div className={PAGE}>
       <PageHead title="Violations" sub="Everything written up on inspections and complaints, and whether it's been fixed." />
-      <Toolbar>
-        <Segmented value={filter} onChange={setFilter} options={[
-          { value: "open", label: "Open" }, { value: "overdue", label: "Past due", tone: "danger" },
-          { value: "corrected", label: "Corrected", tone: "ok" }, { value: "cited", label: "Cited" },
-          { value: "void", label: "Void", tone: "muted" }, { value: "all", label: "All" },
-        ]} />
-        <SearchBox value={q} onChange={setQ} placeholder="Business, address, code or words" />
-      </Toolbar>
+      <FilterBar search={{ value: q, onChange: setQ, placeholder: "Business, address, code or words" }} filters={[
+        { label: "Status", value: filter, empty: "open", onChange: setFilter, options: [
+          { value: "open", label: "Open" }, { value: "overdue", label: "Past due" }, { value: "corrected", label: "Corrected" },
+          { value: "cited", label: "Cited" }, { value: "void", label: "Void" }, { value: "all", label: "All" },
+        ] },
+      ]} />
       <QueryState query={list}>
         {rows.length === 0 ? (
           <EmptyBox title={filter === "overdue" ? "Nothing past due" : "Nothing here"}>

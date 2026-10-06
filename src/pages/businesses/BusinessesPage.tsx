@@ -7,8 +7,8 @@ import { usePermissions } from "@/lib/auth";
 import { formatDay, relativeDay } from "@/lib/format";
 import { BASE, DUE, RISK, keys } from "@/lib/inspections";
 import type { DueState, Listed, PropertyRow } from "@/lib/types";
-import { Badge, Button, Segmented, TONE_EDGE } from "@/components/ui";
-import { Box, EmptyBox, Group, ListRow, PAGE, PageHead, QueryState, SearchBox, Toolbar } from "@/components/kit";
+import { Badge, Button, TONE_EDGE } from "@/components/ui";
+import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
 import { AddBusinessDialog } from "./ProgramDialog";
 
 type Filter = "all" | "overdue" | "due_soon" | "program" | "none";
@@ -45,16 +45,15 @@ export function BusinessesPage() {
         {perms.inspect && <Button variant="primary" size="lg" onClick={() => setAdding(true)}><Plus className="h-5 w-5" />Add a business</Button>}
       </PageHead>
 
-      <Toolbar>
-        <Segmented value={filter} onChange={f => { setFilter(f); setShown(PAGE_SIZE); }} options={[
+      <FilterBar search={{ value: q, onChange: v => { setQ(v); setShown(PAGE_SIZE); }, placeholder: "Name, address or kind of business" }} filters={[
+        { label: "Show", value: filter, empty: "all", onChange: (f: Filter) => { setFilter(f); setShown(PAGE_SIZE); }, options: [
           { value: "all", label: `All (${all.length})` },
-          { value: "overdue", label: `Overdue (${count(r => r.dueState === "overdue")})`, tone: "danger" },
-          { value: "due_soon", label: `Due soon (${count(r => r.dueState === "due_soon")})`, tone: "warn" },
+          { value: "overdue", label: `Overdue (${count(r => r.dueState === "overdue")})` },
+          { value: "due_soon", label: `Due soon (${count(r => r.dueState === "due_soon")})` },
           { value: "program", label: `On the program (${count(r => r.onProgram)})` },
-          { value: "none", label: `Not on it (${count(r => !r.onProgram)})`, tone: "muted" },
-        ]} />
-        <SearchBox value={q} onChange={v => { setQ(v); setShown(PAGE_SIZE); }} placeholder="Name, address or kind of business" />
-      </Toolbar>
+          { value: "none", label: `Not on the program (${count(r => !r.onProgram)})` },
+        ] },
+      ]} />
 
       <QueryState query={list}>
         {rows.length === 0 ? (

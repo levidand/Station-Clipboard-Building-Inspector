@@ -7,12 +7,16 @@ import { usePermissions } from "@/lib/auth";
 import { formatDay, instantDay, relativeDay } from "@/lib/format";
 import { BASE, CASE_PRIORITY, CASE_RESOLUTION, CASE_STATUS, keys, typeLabel, useSettings } from "@/lib/inspections";
 import type { CaseRow, Listed } from "@/lib/types";
-import { Badge, Button, Segmented, TONE_EDGE } from "@/components/ui";
-import { Box, EmptyBox, Group, ListRow, PAGE, PageHead, QueryState, SearchBox, Toolbar } from "@/components/kit";
+import { Badge, Button, TONE_EDGE } from "@/components/ui";
+import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
 import { usePlaceOf } from "@/components/records";
 import { NewComplaintDialog } from "./ComplaintDialogs";
 
 type Filter = "open" | "due" | "closed" | "all";
+const STATUS_OPTIONS: { value: Filter; label: string }[] = [
+  { value: "open", label: "Open" }, { value: "due", label: "Due now" }, { value: "closed", label: "Closed" }, { value: "all", label: "All" },
+];
+const GROUP_TITLE: Record<Filter, string> = { open: "Open complaints", due: "Due now", closed: "Closed complaints", all: "All complaints" };
 
 export function ComplaintsPage() {
   const perms = usePermissions();

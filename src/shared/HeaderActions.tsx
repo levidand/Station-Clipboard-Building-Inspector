@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   AtSign, Award, Bell, BellOff, Calendar, CalendarClock, CheckCheck, ClipboardCheck, ExternalLink, Flag, Handshake,
-  LayoutGrid, LibraryBig, Megaphone, MessageCircle, MessageSquareText, ScanFace, Settings, ShieldCheck, ToggleRight,
+  LayoutGrid, LibraryBig, Megaphone, MessageCircle, MessageSquareText, ScanFace, SearchCheck, Settings, ShieldCheck, ToggleRight,
   Trash2, UserCog, X, type LucideIcon,
 } from "lucide-react";
 import { api, errorMessage, get } from "@/lib/api";
@@ -241,6 +241,7 @@ const TYPE_ICON: [RegExp, LucideIcon][] = [
   [/^chat_mention$/, AtSign],
   [/^(application|interview)/, CalendarClock],
   [/^incident-command/, Handshake],
+  [/^inspections/, SearchCheck],
 ];
 const iconFor = (type: string) => TYPE_ICON.find(([re]) => re.test(type))?.[1] ?? Bell;
 

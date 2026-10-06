@@ -14,6 +14,9 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+// Bring in title-bar edits made in the other portal first (src/shared).
+run("node tools/sync-shared.mjs");
+
 // npm rewrites node_modules/.package-lock.json on every install.
 const installed = mtime(path.join(root, "node_modules", ".package-lock.json"));
 if (installed < newest(["package.json", "package-lock.json"])) {

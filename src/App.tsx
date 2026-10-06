@@ -8,7 +8,7 @@ import { TermsGate } from "./pages/TermsGate";
 import { Shell } from "./components/Shell";
 import { Loading } from "./components/kit";
 import { Button, Spinner } from "./components/ui";
-import { Logo } from "./components/Logo";
+import { Logo } from "./shared/Logo";
 import { TodayPage } from "./pages/Today";
 import { InspectionsPage } from "./pages/inspections/InspectionsPage";
 import { InspectionPage } from "./pages/inspections/InspectionPage";

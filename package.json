@@ -5,8 +5,12 @@
   "type": "module",
   "description": "StationClipboard Inspection Portal — fire marshal, code enforcement and building inspection app backed by the Department Portal API.",
   "scripts": {
+    "sync-shared": "node tools/sync-shared.mjs",
+    "predev": "node tools/sync-shared.mjs",
     "dev": "vite",
+    "predev:demo": "node tools/sync-shared.mjs",
     "dev:demo": "concurrently -k -n api,web \"node server/index.mjs --demo --api-only\" \"vite --mode demo\"",
+    "prebuild": "node tools/sync-shared.mjs",
     "build": "tsc --noEmit -p . && vite build",
     "typecheck": "tsc --noEmit -p .",
     "start": "node server/index.mjs",

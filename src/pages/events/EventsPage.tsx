@@ -6,8 +6,8 @@ import { usePermissions } from "@/lib/auth";
 import { clockTime, dateTime, dayOf, formatDay } from "@/lib/format";
 import { BASE, EVENT_KIND, EVENT_STATUS, keys } from "@/lib/inspections";
 import type { EventRow } from "@/lib/types";
-import { Badge, Button, Segmented } from "@/components/ui";
-import { Box, EmptyBox, Group, ListRow, PAGE, PageHead, QueryState, SearchBox, Toolbar } from "@/components/kit";
+import { Badge, Button } from "@/components/ui";
+import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
 import { NewEventDialog } from "./EventForm";
 
 /** "Sat, Jul 4, 2026, 6:00 PM – 10:00 PM", or both days when it runs over. */
@@ -43,10 +43,11 @@ export function EventsPage() {
       <PageHead title="Events" sub="Special events, fireworks, public education and standby. They show on the department calendar too.">
         {perms.events && <Button variant="primary" size="lg" onClick={() => setAdding(true)}><CalendarPlus className="h-5 w-5" />Plan an event</Button>}
       </PageHead>
-      <Toolbar>
-        <Segmented value={when} onChange={setWhen} options={[{ value: "upcoming", label: "Coming up" }, { value: "past", label: "Past" }, { value: "all", label: "All" }]} />
-        <SearchBox value={q} onChange={setQ} placeholder="Name or place" />
-      </Toolbar>
+      <FilterBar search={{ value: q, onChange: setQ, placeholder: "Name or place" }} filters={[
+        { label: "When", value: when, empty: "upcoming", onChange: setWhen, options: [
+          { value: "upcoming", label: "Coming up" }, { value: "past", label: "Past" }, { value: "all", label: "All" },
+        ] },
+      ]} />
       <QueryState query={list}>
         {rows.length === 0 ? (
           <EmptyBox title={when === "upcoming" ? "Nothing planned" : "No events"}>{perms.events && when === "upcoming" ? "Plan one with the button at the top." : null}</EmptyBox>
