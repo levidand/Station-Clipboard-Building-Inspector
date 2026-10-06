@@ -492,3 +492,18 @@ export function usePersonName() {
 export function EmptyList({ title, children }: { title: string; children?: ReactNode }) {
   return <EmptyBox title={title}>{children}</EmptyBox>;
 }
+
+/**
+ * A business as a Place, from the businesses list, for pages opened with
+ * ?preplan=<id> ("Take a complaint" or "New permit" from a business's page).
+ */
+export function usePlaceOf(preplanId: number | null): Place | undefined {
+  const props = useQuery({
+    queryKey: keys.properties,
+    queryFn: ({ signal }) => get<Listed<PropertyRow>>(`${BASE}/properties`, signal),
+    enabled: !!preplanId,
+    staleTime: 60_000,
+  });
+  const p = preplanId ? props.data?.rows.find(r => r.preplanId === preplanId) : undefined;
+  return p ? { preplanId: p.preplanId, placeName: p.name, address: p.address, latitude: p.latitude, longitude: p.longitude } : undefined;
+}
