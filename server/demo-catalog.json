@@ -1,5 +1,5 @@
 {
- "note": "Generated from Department-Portal artifacts/api-server/src/lib/inspectionsCatalog.ts. Regenerate after changing it.",
+ "note": "Generated from Department-Portal artifacts/api-server/src/lib/inspectionsCatalog.ts by tools/export-catalog.mjs. Regenerate after changing it.",
  "frequencyMonths": {
   "high": 12,
   "moderate": 24,
