@@ -48,7 +48,7 @@ export function PageHead({ title, sub, children, back, badges, lead }: {
     <header className="z-10 -mx-4 flex min-h-[84px] flex-wrap items-center gap-x-4 gap-y-2.5 border-b border-divider bg-alt px-4 py-3.5 shadow-bar md:sticky md:top-0 sm:-mx-6 sm:px-6">
       <div className="min-w-0 flex-1 basis-72">
         {back && (
-          <Link href={back.href} className="mb-1 inline-flex min-h-8 items-center gap-1.5 text-[15px] text-sky hover:underline">
+          <Link href={back.href} className="-my-1.5 inline-flex min-h-11 items-center gap-1.5 pr-2 text-[15px] text-sky hover:underline">
             <ArrowLeft className="h-4 w-4" />{back.label}
           </Link>
         )}
@@ -598,18 +598,21 @@ export function Confirm({ open, title, body, confirmLabel, danger, busy, onConfi
   );
 }
 
-/** A note box under a record's history: write a line, press Add. */
+/**
+ * The box at the top of a record's history: write a line, press Add. If it
+ * doesn't save, the words stay in the box (onAdd says why) to try again.
+ */
 export function NoteComposer({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <div className="flex flex-col gap-2 border-t border-divider px-4 py-3 sm:flex-row sm:items-end">
-      <Textarea value={text} onChange={e => setText(e.target.value)} placeholder="Add a note to this record" className="min-h-[64px] flex-1" />
+    <div className="flex flex-col gap-2 border-b border-divider bg-surface px-4 py-3 sm:flex-row sm:items-end">
+      <Textarea value={text} onChange={e => setText(e.target.value)} placeholder="Add a note to this record" aria-label="A note to add" className="min-h-[64px] flex-1" />
       <Button
         variant="primary" disabled={!text.trim()} loading={busy}
         onClick={async () => {
           setBusy(true);
-          try { await onAdd(text.trim()); setText(""); } finally { setBusy(false); }
+          try { await onAdd(text.trim()); setText(""); } catch { /* onAdd has said what went wrong */ } finally { setBusy(false); }
         }}
       >
         Add note

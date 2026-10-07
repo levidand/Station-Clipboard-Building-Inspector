@@ -52,7 +52,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const perms = usePermissions();
   const today = useQuery({ queryKey: keys.today, queryFn: ({ signal }) => get<Today>(`${BASE}/today`, signal), refetchInterval: 5 * 60_000 });
   const [menuOpen, setMenuOpen] = useState(false);
+  const main = useRef<HTMLElement>(null);
   useEffect(() => { setMenuOpen(false); }, [location]);
+  // The page scrolls inside <main>, not the window, so a new page would open as
+  // far down as the last one was scrolled. Each page starts at its top.
+  useEffect(() => { main.current?.scrollTo({ top: 0 }); }, [location]);
 
   const items = NAV.filter(n => !n.show || n.show(perms));
   const counts = today.data?.counts;
@@ -78,7 +82,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <NavList items={items} location={location} counts={counts} />
           <PortalLinks />
         </aside>
-        <main className="print-root min-w-0 flex-1 overflow-y-auto">{children}</main>
+        <main ref={main} className="print-root min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>
 
       {menuOpen && createPortal(

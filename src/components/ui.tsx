@@ -50,7 +50,8 @@ const VARIANT: Record<Variant, string> = {
   go: "border-field-line bg-go text-white hover:brightness-110 disabled:bg-field disabled:text-ink-4",
 };
 const SIZE: Record<Size, string> = {
-  sm: "h-10 px-3 text-[14px] gap-1.5",
+  /* Still 44px tall: small means narrower and quieter, never a smaller target. */
+  sm: "h-11 px-3 text-[14px] gap-1.5",
   md: "h-11 px-4 text-[15px] gap-2",
   lg: "h-12 px-5 text-[16px] gap-2",
 };

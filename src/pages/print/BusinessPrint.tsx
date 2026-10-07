@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { get } from "@/lib/api";
+import { get, storageUrl } from "@/lib/api";
 import { dayOf, formatDay } from "@/lib/format";
 import { BASE, CASE_STATUS, OCCUPANCY_CLASSES, PERMIT_STATUS, RESULT, RISK, SEVERITY, VIOLATION_STATUS, keys, typeLabel, useSettings } from "@/lib/inspections";
 import type { PropertyDetail } from "@/lib/types";
 import { PAGE, QueryState } from "@/components/kit";
+import { siteLabel } from "@/pages/businesses/BusinessLogo";
 import { InfoTable, Paper } from "./Paper";
 
 /**
@@ -19,6 +20,7 @@ export function BusinessPrint({ id }: { id: number }) {
   if (!d || !s) return <div className={PAGE}><QueryState query={q.data ? settings : q}>{null}</QueryState></div>;
 
   const pp = d.preplan;
+  const logo = storageUrl(d.logoUrl);
   const occupancy = OCCUPANCY_CLASSES.find(o => o.code === d.occupancyClass);
   const open = d.violations.filter(v => v.status === "open");
   const done = d.inspections.filter(i => i.status === "completed" || i.status === "cancelled");
@@ -27,12 +29,19 @@ export function BusinessPrint({ id }: { id: number }) {
 
   return (
     <Paper settings={s} back={{ href: `/businesses/${id}`, label: "Back to the business" }} title={`Business record: ${d.name}`}>
-      <h1 className="mb-1 text-[22px] font-bold">Business Inspection Record</h1>
-      <p className="mb-5 text-[13px]">{d.name} · {d.address}</p>
+      <div className="mb-5 flex items-center gap-4">
+        {logo && <img src={logo} alt="" className="h-14 w-14 shrink-0 object-contain" onError={e => { e.currentTarget.style.display = "none"; }} />}
+        <div className="min-w-0">
+          <h1 className="mb-1 text-[22px] font-bold">Business Inspection Record</h1>
+          <p className="text-[13px]">{d.name} · {d.address}</p>
+        </div>
+      </div>
 
       <InfoTable rows={[
         ["Business", d.name],
         ["Address", d.address],
+        ["Business phone", pp.phone],
+        ["Email and website", [d.email, d.website ? siteLabel(d.website) : null].filter(Boolean).join(" · ")],
         ["Kind of business", d.occupancyType],
         ["Occupancy class", occupancy ? `${occupancy.code} · ${occupancy.label}` : d.occupancyClass],
         ["Risk", d.riskClass ? RISK[d.riskClass].label : null],

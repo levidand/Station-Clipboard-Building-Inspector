@@ -8,7 +8,7 @@ import { dateTime, fromLocalInput, toLocalInput } from "@/lib/format";
 import { BASE, CAUSE_CLASS, INVESTIGATION_STATUS, keys, useRefreshAll } from "@/lib/inspections";
 import type { CommandIncident, InvestigationDetail, InvestigationRow } from "@/lib/types";
 import { Badge, Button, Field, Input, Modal, Select } from "@/components/ui";
-import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
+import { EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, PagedBox, QueryState } from "@/components/kit";
 import { NO_PLACE, PersonSelect, PlacePicker, type Place } from "@/components/records";
 import { toast } from "@/components/toast";
 
@@ -42,16 +42,14 @@ export function InvestigationsPage() {
       <QueryState query={list}>
         {rows.length === 0 ? <EmptyBox title={status === "open" ? "No open investigations" : "Nothing here"} /> : (
           <Group title={`${status === "open" ? "Open" : status === "closed" ? "Closed" : "All"} investigations (${rows.length})`}>
-            <Box>
-              {rows.map(r => (
+            <PagedBox rows={rows} resetKey={params.toString()} render={r => (
                 <ListRow key={r.id} href={`/investigations/${r.id}`} title={r.title}
                   tags={<>
                     <Badge tone={INVESTIGATION_STATUS[r.status].tone}>{INVESTIGATION_STATUS[r.status].label}</Badge>
                     {r.causeClass && <Badge tone={r.causeClass === "incendiary" ? "danger" : "muted"}>{CAUSE_CLASS[r.causeClass].label}</Badge>}
                   </>}
                   detail={[r.number, r.address, r.occurredAt ? dateTime(r.occurredAt, true) : null, r.incidentNumber ? `incident ${r.incidentNumber}` : null, r.leadName].filter(Boolean).join(" · ")} />
-              ))}
-            </Box>
+            )} />
           </Group>
         )}
       </QueryState>

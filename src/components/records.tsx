@@ -5,7 +5,7 @@ import { Building2, Camera, CheckCircle2, ExternalLink, FileText, Loader2, MapPi
 import { api, errorMessage, get } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { portalTarget, signedInHref } from "@/shared/departmentPortal";
-import { dateTime, formatDay, plural, relativeDay, timeOfDay, todayKey } from "@/lib/format";
+import { addressUnder, dateTime, formatDay, plural, relativeDay, timeOfDay, todayKey } from "@/lib/format";
 import {
   BASE, DISCIPLINE_LABELS, INSPECTION_STATUS, RESULT, SEVERITY, VIOLATION_STATUS, deleteFile, fileUrl, keys, typeLabel,
   uploadFile, useChecklists, usePeople, useRefreshAll, useSettings, type RecordKind,
@@ -14,7 +14,7 @@ import type {
   Discipline, FileRef, HistoryLine, InspectionDetail, InspectionRow, Listed, Person, PropertyRow, Violation,
 } from "@/lib/types";
 import { Badge, Button, Field, IconButton, Input, Modal, Segmented, Select, Textarea, TONE_EDGE, cx } from "./ui";
-import { ActionMenu, Box, EmptyBox, ListRow, Note, NoteComposer } from "./kit";
+import { ActionMenu, Box, EmptyBox, ListRow, Note, NoteComposer, Pager, usePaged } from "./kit";
 import { toast } from "./toast";
 
 // ---------------------------------------------------------------------------
@@ -320,33 +320,40 @@ export function FilesPanel({ kind, id, files, canEdit, onChange }: {
 // History
 // ---------------------------------------------------------------------------
 
-/** What happened to a record, newest first, and a box to add a note. */
+/**
+ * What happened to a record, newest first, ten to a page, with the box to add
+ * a note on top, where the newest line goes.
+ */
 export function HistoryPanel({ history, kind, id, canWrite, onChange }: {
   history: HistoryLine[]; kind: Exclude<RecordKind, "violations">; id: number; canWrite: boolean; onChange: (h: HistoryLine[]) => void;
 }) {
   const lines = [...history].reverse();
+  const paged = usePaged(lines, 10);
   return (
-    <Box>
-      {lines.length === 0 ? <p className="px-4 py-4 text-[15px] text-ink-3">Nothing yet.</p> : (
-        <ol>
-          {lines.map((h, i) => (
-            <li key={`${h.at}-${i}`} className="flex gap-3 border-b border-divider px-4 py-3 last:border-b-0">
-              <span className={cx("mt-2 h-2.5 w-2.5 shrink-0 rounded-full", h.kind === "note" ? "bg-sky" : "bg-ink-4")} />
-              <div className="min-w-0 flex-1">
-                <div className={cx("whitespace-pre-line text-[16px] leading-6", h.kind === "note" ? "text-ink" : "text-ink-2")}>{h.text}</div>
-                <div className="text-[14px] text-ink-3">{[h.by, dateTime(h.at, true)].filter(Boolean).join(" · ")}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-      {canWrite && (
-        <NoteComposer onAdd={async text => {
-          try { onChange(await api<HistoryLine[]>("POST", `${BASE}/notes/${kind}/${id}`, { text })); }
-          catch (err) { toast.error(errorMessage(err)); throw err; }
-        }} />
-      )}
-    </Box>
+    <>
+      <Box>
+        {canWrite && (
+          <NoteComposer onAdd={async text => {
+            try { onChange(await api<HistoryLine[]>("POST", `${BASE}/notes/${kind}/${id}`, { text })); paged.setPage(0); }
+            catch (err) { toast.error(errorMessage(err)); throw err; }
+          }} />
+        )}
+        {lines.length === 0 ? <p className="px-4 py-4 text-[15px] text-ink-3">Nothing yet.</p> : (
+          <ol>
+            {paged.rows.map((h, i) => (
+              <li key={`${h.at}-${i}`} className="flex gap-3 border-b border-divider px-4 py-3 last:border-b-0">
+                <span className={cx("mt-2 h-2.5 w-2.5 shrink-0 rounded-full", h.kind === "note" ? "bg-sky" : "bg-ink-4")} />
+                <div className="min-w-0 flex-1">
+                  <div className={cx("whitespace-pre-line break-words text-[16px] leading-6", h.kind === "note" ? "text-ink" : "text-ink-2")}>{h.text}</div>
+                  <div className="text-[14px] text-ink-3">{[h.by, dateTime(h.at, true)].filter(Boolean).join(" · ")}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Box>
+      <Pager {...paged} attached />
+    </>
   );
 }
 
@@ -441,7 +448,7 @@ function ScheduleForm({ onClose, preset }: { onClose: () => void; preset: Schedu
           <div>
             <span className="block text-[15px] font-medium">Where</span>
             <p className="mt-1 text-[17px]">{place.placeName ?? place.address}</p>
-            {place.placeName && <p className="text-[15px] text-ink-3">{place.address}</p>}
+            {place.placeName && addressUnder(place.placeName, place.address) && <p className="text-[15px] text-ink-3">{addressUnder(place.placeName, place.address)}</p>}
           </div>
         ) : <PlacePicker value={place} onChange={setPlace} />}
         <div className="grid gap-4 sm:grid-cols-2">

@@ -7,7 +7,7 @@ import { addDays } from "@/lib/format";
 import { BASE, DISCIPLINE_LABELS, keys } from "@/lib/inspections";
 import type { Discipline, InspectionRow, Listed } from "@/lib/types";
 import { Button } from "@/components/ui";
-import { Box, EmptyBox, FilterBar, Group, PAGE, PageHead, QueryState } from "@/components/kit";
+import { EmptyBox, FilterBar, Group, PAGE, PageHead, PagedBox, QueryState } from "@/components/kit";
 import { InspectionListRow, ScheduleDialog } from "@/components/records";
 
 type Status = "open" | "completed" | "cancelled";
@@ -28,6 +28,8 @@ export function InspectionsPage() {
   });
   const rows = list.data?.rows ?? [];
   const today = list.data?.today ?? "";
+  // A new search or filter starts every list back on its first page.
+  const resetKey = params.toString();
 
   return (
     <div className={PAGE}>
@@ -52,10 +54,10 @@ export function InspectionsPage() {
             {status === "open" && perms.inspect ? "Schedule one from the button at the top, or from a business." : null}
           </EmptyBox>
         ) : status === "open" ? (
-          <OpenGroups rows={rows} today={today} />
+          <OpenGroups rows={rows} today={today} resetKey={resetKey} />
         ) : (
           <Group title={`${status === "completed" ? "Finished" : "Cancelled"} (${rows.length})`}>
-            <Box>{rows.map(r => <InspectionListRow key={r.id} row={r} today={today} />)}</Box>
+            <PagedBox rows={rows} resetKey={resetKey} render={r => <InspectionListRow key={r.id} row={r} today={today} />} />
           </Group>
         )}
       </QueryState>
@@ -65,7 +67,7 @@ export function InspectionsPage() {
   );
 }
 
-function OpenGroups({ rows, today }: { rows: InspectionRow[]; today: string }) {
+function OpenGroups({ rows, today, resetKey }: { rows: InspectionRow[]; today: string; resetKey: string }) {
   const weekEnd = addDays(today, 7);
   const groups: [string, InspectionRow[]][] = [
     ["Late", rows.filter(r => r.scheduledOn && r.scheduledOn < today)],
@@ -78,7 +80,7 @@ function OpenGroups({ rows, today }: { rows: InspectionRow[]; today: string }) {
     <>
       {groups.filter(([, list]) => list.length).map(([title, list]) => (
         <Group key={title} title={`${title} (${list.length})`}>
-          <Box>{list.map(r => <InspectionListRow key={r.id} row={r} today={today} />)}</Box>
+          <PagedBox rows={list} resetKey={resetKey} render={r => <InspectionListRow key={r.id} row={r} today={today} />} />
         </Group>
       ))}
     </>

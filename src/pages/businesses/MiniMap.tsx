@@ -16,7 +16,13 @@ export default function MiniMap({ latitude, longitude, due, hydrants }: { latitu
 
   useEffect(() => {
     if (!el.current) return;
-    const m = L.map(el.current, { center: [latitude, longitude], zoom: 17, scrollWheelZoom: false, zoomControl: true });
+    const m = L.map(el.current, { scrollWheelZoom: false, zoomControl: true });
+    // Framed on the business and the nearest few hydrants, so the closest one is always in view. Placed
+    // without the zoom animation: the map is rebuilt when the hydrants arrive, and taking it down halfway
+    // through an animation throws ("_leaflet_pos" of undefined).
+    const frame = [L.latLng(latitude, longitude), ...hydrants.slice(0, 3).map(h => L.latLng(h.latitude, h.longitude))];
+    if (frame.length > 1) m.fitBounds(L.latLngBounds(frame), { padding: [36, 36], maxZoom: 18, animate: false });
+    else m.setView([latitude, longitude], 17, { animate: false });
     const base = MAP_BASES.streets;
     base.layers.forEach((url, i) => L.tileLayer(url, { attribution: i === 0 ? base.attribution : undefined, maxZoom: 20, maxNativeZoom: 19 }).addTo(m));
     const renderer = L.canvas({ padding: 0.5 });
@@ -28,13 +34,9 @@ export default function MiniMap({ latitude, longitude, due, hydrants }: { latitu
         .addTo(m);
     }
     shapeMarker([latitude, longitude], { renderer, ...businessStyle(due), radius: 12, weight: 2 }).addTo(m);
-    // Framed on the business and the nearest few hydrants, so the closest one is always in view.
-    const frame = [L.latLng(latitude, longitude), ...hydrants.slice(0, 3).map(h => L.latLng(h.latitude, h.longitude))];
-    if (frame.length > 1) m.fitBounds(L.latLngBounds(frame), { padding: [36, 36], maxZoom: 18 });
-    return () => { m.remove(); };
+    return () => { m.stop(); m.remove(); };
   }, [latitude, longitude, due, hydrants]);
 
-  // `isolate`: Leaflet's panes carry z-indexes in the hundreds; without their own stacking
-  // context they'd paint over the sticky page head and the Actions menu.
-  return <div ref={el} className="isolate h-64 w-full" role="img" aria-label="Map of the business and the hydrants near it" />;
+  // Leaflet's z-indexes stay inside the map (index.css gives every map its own stacking context).
+  return <div ref={el} className="h-64 w-full" role="img" aria-label="Map of the business and the hydrants near it" />;
 }

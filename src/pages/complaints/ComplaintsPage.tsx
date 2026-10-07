@@ -8,7 +8,7 @@ import { formatDay, instantDay, relativeDay } from "@/lib/format";
 import { BASE, CASE_PRIORITY, CASE_RESOLUTION, CASE_STATUS, keys, typeLabel, useSettings } from "@/lib/inspections";
 import type { CaseRow, Listed } from "@/lib/types";
 import { Badge, Button, TONE_EDGE } from "@/components/ui";
-import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
+import { EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, PagedBox, QueryState } from "@/components/kit";
 import { usePlaceOf } from "@/components/records";
 import { NewComplaintDialog } from "./ComplaintDialogs";
 
@@ -55,8 +55,7 @@ export function ComplaintsPage() {
       <QueryState query={list}>
         {rows.length === 0 ? <EmptyBox title={filter === "due" ? "Nothing due" : "No complaints here"} /> : (
           <Group title={`${GROUP_TITLE[filter]} (${rows.length})`}>
-            <Box>
-              {rows.map(c => (
+            <PagedBox rows={rows} resetKey={params.toString()} render={c => (
                 <ListRow
                   key={c.id} href={`/complaints/${c.id}`}
                   edge={c.overdue ? TONE_EDGE.danger : c.priority === "high" && c.status !== "closed" ? TONE_EDGE.warn : undefined}
@@ -68,8 +67,7 @@ export function ComplaintsPage() {
                   </>}
                   detail={[c.number, c.placeName ? c.address : null, `received ${instantDay(c.receivedAt)}`, c.assignedName ?? (c.status === "closed" ? null : "Not assigned"), c.resolution ? CASE_RESOLUTION[c.resolution] : null].filter(Boolean).join(" · ")}
                 />
-              ))}
-            </Box>
+              )} />
           </Group>
         )}
       </QueryState>

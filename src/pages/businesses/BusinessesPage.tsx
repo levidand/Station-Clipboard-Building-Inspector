@@ -8,13 +8,13 @@ import { formatDay, relativeDay } from "@/lib/format";
 import { BASE, DUE, RISK, keys } from "@/lib/inspections";
 import type { DueState, Listed, PropertyRow } from "@/lib/types";
 import { Badge, Button, TONE_EDGE } from "@/components/ui";
-import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
+import { EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, PagedBox, QueryState } from "@/components/kit";
 import { AddBusinessDialog } from "./ProgramDialog";
 import { BusinessLogo } from "./BusinessLogo";
 
 type Filter = "all" | "overdue" | "due_soon" | "program" | "none";
 const ORDER: Record<DueState, number> = { overdue: 0, due_soon: 1, current: 2, none: 3 };
-const PAGE_SIZE = 150;
+const TITLE: Record<Filter, string> = { all: "All businesses", overdue: "Overdue", due_soon: "Due within 30 days", program: "On the program", none: "Not on the program" };
 
 export function BusinessesPage() {
   const perms = usePermissions();
@@ -23,7 +23,6 @@ export function BusinessesPage() {
   const [filter, setFilter] = useState<Filter>((["overdue", "due_soon", "program", "none"].includes(search.get("due") ?? "") ? search.get("due") : "all") as Filter);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
-  const [shown, setShown] = useState(PAGE_SIZE);
   const list = useQuery({ queryKey: keys.properties, queryFn: ({ signal }) => get<Listed<PropertyRow>>(`${BASE}/properties`, signal) });
 
   const rows = useMemo(() => {
@@ -46,8 +45,8 @@ export function BusinessesPage() {
         {perms.inspect && <Button variant="primary" size="lg" onClick={() => setAdding(true)}><Plus className="h-5 w-5" />Add a business</Button>}
       </PageHead>
 
-      <FilterBar search={{ value: q, onChange: v => { setQ(v); setShown(PAGE_SIZE); }, placeholder: "Name, address or kind of business" }} filters={[
-        { label: "Show", value: filter, empty: "all", onChange: (f: Filter) => { setFilter(f); setShown(PAGE_SIZE); }, options: [
+      <FilterBar search={{ value: q, onChange: setQ, placeholder: "Name, address or kind of business" }} filters={[
+        { label: "Show", value: filter, empty: "all", onChange: setFilter, options: [
           { value: "all", label: `All (${all.length})` },
           { value: "overdue", label: `Overdue (${count(r => r.dueState === "overdue")})` },
           { value: "due_soon", label: `Due soon (${count(r => r.dueState === "due_soon")})` },
@@ -62,9 +61,8 @@ export function BusinessesPage() {
             {all.length === 0 ? "Businesses are the department's preplans. Add one here, or preplan buildings in the Command Portal." : "Try another word, or a different filter."}
           </EmptyBox>
         ) : (
-          <Group title={`${rows.length} business${rows.length === 1 ? "" : "es"}`}>
-            <Box>
-              {rows.slice(0, shown).map(r => (
+          <Group title={`${TITLE[filter]} (${rows.length})`}>
+            <PagedBox rows={rows} resetKey={`${filter}|${q}`} render={r => (
                 <ListRow
                   key={r.preplanId} href={`/businesses/${r.preplanId}`}
                   lead={<BusinessLogo name={r.name} logoUrl={r.logoUrl} />}
@@ -82,11 +80,7 @@ export function BusinessesPage() {
                     r.onProgram && r.nextDueOn ? `due ${formatDay(r.nextDueOn, { weekday: false })}` : null,
                   ].filter(Boolean).join(" · ")}
                 />
-              ))}
-            </Box>
-            {rows.length > shown && (
-              <Button className="mt-3" onClick={() => setShown(s => s + PAGE_SIZE)}>Show {Math.min(PAGE_SIZE, rows.length - shown)} more</Button>
-            )}
+            )} />
           </Group>
         )}
       </QueryState>

@@ -36,6 +36,9 @@ const MapPage = lazy(() => import("./pages/map/MapPage").then(m => ({ default: m
 /*
  * Addresses. The Department Portal's /modules/inspections/* links open these
  * (pages/inspection-portal-redirect.tsx there), so keep the two in step.
+ * A record page is keyed by its id: going from one inspection straight to
+ * another (a re-inspection link, a search result) starts the page afresh, so
+ * nothing typed or ticked on the first can carry over to the second.
  */
 export function App() {
   const { session, loading, logout } = useAuth();
@@ -76,29 +79,29 @@ export function App() {
           <Route path="/"><TodayPage /></Route>
 
           <Route path="/inspections"><InspectionsPage /></Route>
-          <Route path="/inspections/:id/report">{p => <InspectionReport id={Number(p.id)} />}</Route>
-          <Route path="/inspections/:id/notice">{p => <ViolationNotice id={Number(p.id)} />}</Route>
-          <Route path="/inspections/:id">{p => <InspectionPage id={Number(p.id)} />}</Route>
+          <Route path="/inspections/:id/report">{p => <InspectionReport key={p.id} id={Number(p.id)} />}</Route>
+          <Route path="/inspections/:id/notice">{p => <ViolationNotice key={p.id} id={Number(p.id)} />}</Route>
+          <Route path="/inspections/:id">{p => <InspectionPage key={p.id} id={Number(p.id)} />}</Route>
 
           <Route path="/businesses"><BusinessesPage /></Route>
-          <Route path="/businesses/:id/print">{p => <BusinessPrint id={Number(p.id)} />}</Route>
-          <Route path="/businesses/:id">{p => <BusinessPage id={Number(p.id)} />}</Route>
+          <Route path="/businesses/:id/print">{p => <BusinessPrint key={p.id} id={Number(p.id)} />}</Route>
+          <Route path="/businesses/:id">{p => <BusinessPage key={p.id} id={Number(p.id)} />}</Route>
 
           <Route path="/violations"><ViolationsPage /></Route>
 
           <Route path="/permits"><PermitsPage /></Route>
-          <Route path="/permits/:id/print">{p => <PermitPrint id={Number(p.id)} />}</Route>
-          <Route path="/permits/:id">{p => <PermitPage id={Number(p.id)} />}</Route>
+          <Route path="/permits/:id/print">{p => <PermitPrint key={p.id} id={Number(p.id)} />}</Route>
+          <Route path="/permits/:id">{p => <PermitPage key={p.id} id={Number(p.id)} />}</Route>
 
           <Route path="/complaints"><ComplaintsPage /></Route>
-          <Route path="/complaints/:id/notice">{p => <CaseNoticePrint id={Number(p.id)} />}</Route>
-          <Route path="/complaints/:id">{p => <ComplaintPage id={Number(p.id)} />}</Route>
+          <Route path="/complaints/:id/notice">{p => <CaseNoticePrint key={p.id} id={Number(p.id)} />}</Route>
+          <Route path="/complaints/:id">{p => <ComplaintPage key={p.id} id={Number(p.id)} />}</Route>
 
           <Route path="/events"><EventsPage /></Route>
-          <Route path="/events/:id">{p => <EventPage id={Number(p.id)} />}</Route>
+          <Route path="/events/:id">{p => <EventPage key={p.id} id={Number(p.id)} />}</Route>
 
           <Route path="/investigations">{perms.investigations ? <InvestigationsPage /> : <Redirect to="/" />}</Route>
-          <Route path="/investigations/:id">{p => perms.investigations ? <InvestigationPage id={Number(p.id)} /> : <Redirect to="/" />}</Route>
+          <Route path="/investigations/:id">{p => perms.investigations ? <InvestigationPage key={p.id} id={Number(p.id)} /> : <Redirect to="/" />}</Route>
 
           <Route path="/map"><Suspense fallback={<Loading />}><MapPage /></Suspense></Route>
           <Route path="/settings/:section?">{p => <SettingsPage section={p.section} />}</Route>

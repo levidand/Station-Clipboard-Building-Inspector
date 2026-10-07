@@ -75,7 +75,7 @@ export function MapPage() {
         a.onclick = ev => { ev.preventDefault(); navigate(a.dataset.href!); };
       });
     });
-    return () => { m.remove(); map.current = null; };
+    return () => { m.stop(); m.remove(); map.current = null; };
   }, [navigate]);
 
   useEffect(() => {
@@ -149,12 +149,12 @@ export function MapPage() {
     }
     sized.current = sizes;
     if (!fitted.current && focused) {
-      m.setView(focused.getLatLng(), 17);
+      m.setView(focused.getLatLng(), 17, { animate: false });
       focused.openPopup();
       fitted.current = true;
     }
     if (!fitted.current && points.length) {
-      m.fitBounds(L.latLngBounds(points).pad(0.1), { maxZoom: 16 });
+      m.fitBounds(L.latLngBounds(points).pad(0.1), { maxZoom: 16, animate: false });
       fitted.current = true;
     }
   }, [data, show, settings.data, focus]);

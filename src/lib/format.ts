@@ -143,6 +143,27 @@ export function initials(name: string | null | undefined): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join("");
 }
 
+/**
+ * A place's name with its address, "Riverbend Pizza Kitchen, 1200 Meridian Pkwy…",
+ * without saying the name twice when the address already starts with it
+ * ("Demo City Park, 100 Park Ln" stays as it is).
+ */
+export function placeLine(name: string | null | undefined, address: string | null | undefined): string {
+  const n = name?.trim(), a = address?.trim();
+  if (!n) return a ?? "";
+  if (!a) return n;
+  return a.toLowerCase().startsWith(n.toLowerCase()) ? a : `${n}, ${a}`;
+}
+
+/** The address to show under a place's name, or null when the name already says it. */
+export function addressUnder(name: string | null | undefined, address: string | null | undefined): string | null {
+  const n = name?.trim(), a = address?.trim();
+  if (!a) return null;
+  if (!n) return a;
+  if (a.toLowerCase() === n.toLowerCase()) return null;
+  return a.toLowerCase().startsWith(`${n.toLowerCase()},`) ? a.slice(n.length + 1).trim() : a;
+}
+
 /** "1 violation", "3 violations". */
 export function plural(n: number, one: string, other = `${one}s`): string {
   return `${n} ${n === 1 ? one : other}`;

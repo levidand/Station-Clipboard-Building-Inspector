@@ -8,7 +8,7 @@ import { daysBetween, formatDay } from "@/lib/format";
 import { BASE, PERMIT_CATEGORY, PERMIT_STATUS, keys, typeLabel, useSettings } from "@/lib/inspections";
 import type { Listed, PermitCategory, PermitRow } from "@/lib/types";
 import { Badge, Button, TONE_EDGE } from "@/components/ui";
-import { Box, EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, QueryState } from "@/components/kit";
+import { EmptyBox, FilterBar, Group, ListRow, PAGE, PageHead, PagedBox, QueryState } from "@/components/kit";
 import { usePlaceOf } from "@/components/records";
 import { NewPermitDialog } from "./PermitDialogs";
 
@@ -64,8 +64,7 @@ export function PermitsPage() {
           <EmptyBox title="No permits here">{filter === "waiting" && perms.permits ? "New applications go in with the button at the top." : null}</EmptyBox>
         ) : (
           <Group title={`${GROUP_TITLE[filter]} (${rows.length})`}>
-            <Box>
-              {rows.map(p => {
+            <PagedBox rows={rows} resetKey={params.toString()} render={p => {
                 const waiting = ["applied", "in_review", "corrections", "approved"].includes(p.status);
                 const age = waiting && p.appliedOn ? daysBetween(p.appliedOn, today) : null;
                 const expiring = p.status === "issued" && p.expiresOn && daysBetween(today, p.expiresOn) <= 30;
@@ -82,8 +81,7 @@ export function PermitsPage() {
                     detail={[p.number, p.applicantCompany ?? p.applicantName, p.reviewerName ? `review: ${p.reviewerName}` : null, p.issuedOn ? `issued ${formatDay(p.issuedOn, { weekday: false })}` : null].filter(Boolean).join(" · ")}
                   />
                 );
-              })}
-            </Box>
+              }} />
           </Group>
         )}
       </QueryState>

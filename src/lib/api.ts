@@ -20,6 +20,11 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   /** Send this as the raw body (a photo) instead of JSON. */
   raw?: Blob;
+  /**
+   * Let the request finish after the page has gone (a save made as someone
+   * leaves the page or closes the tab). The browser caps such a body at 64 KB.
+   */
+  keepalive?: boolean;
 }
 
 /** On a weak signal a request can hang for minutes without failing; past these it is treated as dropped. */
@@ -51,7 +56,7 @@ export async function api<T = unknown>(method: string, url: string, body?: unkno
   let res: Response;
   let text: string;
   try {
-    res = await fetch(url, { method, headers, body: payload, credentials: "include", signal: ctrl.signal });
+    res = await fetch(url, { method, headers, body: payload, credentials: "include", signal: ctrl.signal, keepalive: opts.keepalive });
     text = await res.text();
   } catch (err) {
     if (timedOut) throw new ApiError(0, SLOW_MESSAGE, { offline: true, timeout: true });
